@@ -32,7 +32,8 @@ function BotSetting({detail, handleChangeModelConfig, modelList}) {
       const info = modelList.find((v) =>
         detail?.model_config?.model?.model_id
           ? v.id === detail?.model_config?.model?.model_id
-          : v.model_name === detail?.model_config?.model?.name
+          : v.model_name === detail?.model_config?.model?.name &&
+            v.provider === detail?.model_config?.model?.provider
       )
       if (info) {
         setModelInfo(info)

@@ -371,7 +371,7 @@ function MessageInput({
                 <ModelSelect
                   modelList={modelList}
                   className="w-[200px] bg-[#F2F2F2] rounded-[8px] border-[0.5px] border-[#AEAFB366]"
-                  value={modelInfo?.id || modelValue?.name}
+                  value={modelInfo?.id || modelValue}
                   placeholder="Select model"
                   onChange={(value) => {
                     // const info = modelList.find((v) => v.model_name === value.m)

@@ -5,8 +5,15 @@ function FormatValue({modelList, value}) {
   if (!modelList || !value) return null
   const modelInfo = modelList.find((v) => {
     if (typeof value === 'string') {
-      return v.id === value || v.model_name === value
+      return v.id === value
     }
+    if (value && value.provider) {
+      return (
+        (value.name === v.model_name || value.model_name === v.model_name) &&
+        value.provider === v.provider
+      )
+    }
+
     if (!value.model_id && !value.id) {
       return value.name === v.model_name || value.model_name === v.model_name
     }
@@ -38,6 +45,9 @@ function FormatValue({modelList, value}) {
     )
   }
   if (typeof value === 'string') return value
+  if (value && value.provider) {
+    return value.name || value.model_name
+  }
 
   return value.model_name
 }

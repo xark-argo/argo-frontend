@@ -41,11 +41,12 @@ function Installation({
   const [modelStatus, setModelStatus] = useState(null)
   const [chatModels, setChatModels] = useState([])
   const [embeddingModels, setEmbeddingModels] = useState([])
-  const [changeModel, setChangeModel] = useState({})
+  const [changeModel, setChangeModel] = useState({name: '', provider: ''})
   const [knowledgeModel, setKnowledgeModel] = useState([])
   const [chatModelsStatue, setChatModelsStatue] = useState('')
   const [embeddingModelsStatue, setEmbeddingModelsStatue] = useState([])
   const [disableInstall, setDisableInstall] = useState(false)
+  const [modelList, setModelList] = useState([])
   const history = useHistory()
 
   const timer = useRef(null)
@@ -54,6 +55,7 @@ function Installation({
     const data = await getModelList({
       download_status: 'all_complete',
     })
+    setModelList(data?.model_list || [])
     if (data?.model_list && data?.model_list?.length > 0) {
       const embeddingModel = data.model_list.filter(
         (item) => item.is_embeddings
@@ -65,7 +67,19 @@ function Installation({
   }
 
   const handleChangeModelConfig = async () => {
-    const vals = {model: changeModel}
+    const select = modelList.find((v) => {
+      return (
+        changeModel.name === v.model_name && changeModel.provider === v.provider
+      )
+    })
+    let vals
+    if (select) {
+      vals = {
+        model: {...changeModel, icon_url: select.icon_url, model_id: select.id},
+      }
+    } else {
+      vals = {model: changeModel}
+    }
     const newConfigs = mergeObjects(detail, {model_config: {...vals}})
     detail.model_config = newConfigs.model_config
     await updateBotConfig({
