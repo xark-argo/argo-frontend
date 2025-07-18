@@ -337,7 +337,7 @@ function Chat() {
       >
         <div className="flex flex-1 h-full max-w-[100vw] overflow-auto">
           <div
-            className={`${$openPlan ? 'w-1/2' : 'w-5/6'} mx-auto h-full relative z-10 flex-1`}
+            className={`${$openPlan || (!visible && visibleExtra) ? 'w-1/2' : 'w-5/6'} mx-auto h-full relative z-10 flex-1`}
             // className={`${(plugin_config?.live2d?.enable || visible) && $showSidebar ? 'w-[650px]' : 'basis-2/3'} transition-all mx-auto h-full relative z-10`}
           >
             <Conversation

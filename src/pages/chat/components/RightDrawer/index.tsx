@@ -12,7 +12,7 @@ function RightDrawer({refreshBot, visible}) {
 
   return (
     <div
-      className={`h-full relative ${$currentModel.live2denable ? 'w-[360px]' : ''}`}
+      className={`h-full relative ${$currentModel.live2dEnable ? 'w-[360px]' : ''}`}
     >
       <div
         className={`${visible ? 'w-[360px] border-l-[1px]' : 'w-[0px] overflow-hidden'} relative z-10 bg-white h-full box-border flex flex-col`}
