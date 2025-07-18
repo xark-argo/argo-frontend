@@ -259,7 +259,7 @@ function MessageItem({
                 }
                 const regex = /[….?!。？！]/
                 const match = regex.exec(buffer)
-                if (match !== null && $currentModel.live2denable) {
+                if (match !== null && $currentModel.live2dEnable) {
                   const {index} = match
                   const sentence = buffer.substring(0, index + 1) // 提取一句话
                   const plainText = sentence.replace(/<[^>]*>/g, '')

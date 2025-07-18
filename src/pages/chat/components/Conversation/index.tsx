@@ -196,9 +196,9 @@ function Conversation({
 
   const playAudioLipSync = (text) => {
     if (!$live2dModel.checkModelLoaded()) return
-    if (!$currentModel.voiceenable) {
-      $live2dModel.setExpressionWithText($currentModel?.emotionMap, text)
-      $live2dModel.setMotionWithText($currentModel?.motionMap, text)
+    if (!$currentModel.voiceEnable) {
+      $live2dModel.setExpressionWithText($currentModel?.emotionMap || {}, text)
+      $live2dModel.setMotionWithText($currentModel?.motionMap || {}, text)
       audioQueue.clearQueue()
       $live2dModel?.stopSpeaking()
       return
@@ -215,8 +215,11 @@ function Conversation({
       })
       audioQueue.addTask(() => {
         return new Promise((resolve) => {
-          $live2dModel.setExpressionWithText($currentModel?.emotionMap, text)
-          $live2dModel.setMotionWithText($currentModel?.motionMap, text)
+          $live2dModel.setExpressionWithText(
+            $currentModel?.emotionMap || {},
+            text
+          )
+          $live2dModel.setMotionWithText($currentModel?.motionMap || {}, text)
           $live2dModel.speak(voice).then(() => {
             resolve(1)
           })
@@ -460,7 +463,7 @@ function Conversation({
               // setResponse(cloneDeep(response))
               const regex = /[….?!。？！]/
               const match = regex.exec(buffer)
-              if (match !== null && $currentModel.live2denable) {
+              if (match !== null && $currentModel.live2dEnable) {
                 const {index} = match
                 const sentence = buffer.substring(0, index + 1) // 提取一句话
                 const plainText = sentence.replace(/<[^>]*>/g, '')

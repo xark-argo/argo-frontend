@@ -58,7 +58,7 @@ function Live2dModel() {
       },
     } = $activeChat
     $currentModel.voice = pluginInfo?.tts?.voice || ''
-    $currentModel.voiceenable = pluginInfo?.tts?.enable || false
+    $currentModel.voiceEnable = pluginInfo?.tts?.enable || false
     $currentModel.live2dEnable = pluginInfo?.live2d?.enable || false
     $currentModel.live2dModel = pluginInfo?.live2d?.model || ''
     setCurrentModel({...$currentModel})
