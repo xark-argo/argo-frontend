@@ -10,7 +10,7 @@ import {WEBUI_API_BASE_URL} from '~/lib/constants'
 
 import {bellaAction, bellaBotDetail, currentBellaMessage} from '../atoms'
 import useTTS from '../hooks/useTTS'
-import AudioRecorderButton from './AudioRecorderButton'
+// import AudioRecorderButton from './AudioRecorderButton'
 
 function BellaConversation() {
   const {t} = useTranslation()
@@ -153,9 +153,9 @@ function BellaConversation() {
         {/* 输入框 */}
         <div className="mt-4">
           {/* 音频录入按钮 */}
-          <AudioRecorderButton
+          {/* <AudioRecorderButton
             onResult={(text) => setInputValue((v) => v + text)}
-          />
+          /> */}
           <div className="flex items-center space-x-4 max-w-2xl mx-auto">
             <div className="flex-1 relative">
               <textarea
