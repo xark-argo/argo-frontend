@@ -34,25 +34,24 @@ function useVideoConfig() {
 
   const playVideo = useCallback(
     (a: string) => {
-      if (!videoRef.current) return
+      if (!videoRef.current || (a === action && a !== 'idle')) return
       const video = videoRef.current
       video.src = findVideo(a)
       video.loop = a === 'idle'
-      video.play().catch((err) => {
-        console.error('Failed to play video:', err)
-      })
+      video.play().catch(() => {})
     },
-    [videoRef, findVideo]
+    [videoRef, findVideo, action]
   )
 
   useEffect(() => {
     // 检测 <display>{"action": "xxx"}</display>
     const match = streamContent.match(/<display>(.*?)<\/display>/)
-    if (match?.[1]) {
-      console.info('action match', match[1])
+    if (match?.[1] && match[1] !== action) {
+      console.info('action match', match?.[1], action)
+      setAction(match[1])
       playVideo(match[1])
     }
-  }, [streamContent, playVideo])
+  }, [streamContent, playVideo, action, setAction])
 
   useEffect(() => {
     playVideo(action)

@@ -8,7 +8,8 @@ import {bellaAction, bellaTtsConfig, currentBellaMessage} from '../atoms'
 
 function useTTS() {
   const playIndex = useRef(0)
-  const [{content: sentences}, setCurrentMessage] = useAtom(currentBellaMessage)
+  const [{content: sentences, role}, setCurrentMessage] =
+    useAtom(currentBellaMessage)
   const sentencesRef = useRef<string[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(new Audio())
   const [isPlayingAudio, setIsPlayingAudio] = useState(false)
@@ -57,6 +58,7 @@ function useTTS() {
         }
       })
       if (playIndex.current < sentencesRef.current.length) {
+        playIndex.current += 1
         getAudio()
       } else {
         sentencesRef.current = []
@@ -65,7 +67,7 @@ function useTTS() {
       }
     }
     if (
-      playIndex.current >= sentencesRef.current.length - 1 ||
+      playIndex.current === sentencesRef.current.length - 1 ||
       !cleanedSentence
     ) {
       setCurrentMessage({
@@ -85,10 +87,6 @@ function useTTS() {
 
     const audio = audioRef.current
     if (!audio || !ttsVoice) return
-    // if (!ttsVoice) {
-    //   onPlayEnded()
-    //   return
-    // }
 
     audio.src = `data:audio/wav;base64,${ttsVoice}`
     setIsPlayingAudio(true)
@@ -102,15 +100,19 @@ function useTTS() {
 
   useEffect(() => {
     const dealSentences = sentences
-      .replace(/<display>.*?<\/display>/gis, '')
-      .split('\n')
+      .replace(/(?:[（(][^()（）]*[）)]|<display>.*?<\/display>)/gis, '')
+      .split(/[。？！?.!\n]/g)
+      .filter((item) => item.trim() !== '')
     sentencesRef.current = dealSentences
-    if (!hasStartedRef.current && dealSentences.length > 1) {
+    if (
+      !hasStartedRef.current &&
+      dealSentences.length > 1 &&
+      role === 'assistant'
+    ) {
       hasStartedRef.current = true
-      console.info('getAudio')
-      getAudio()
+      setTimeout(getAudio, 800)
     }
-  }, [sentences, getAudio])
+  }, [sentences, getAudio, role])
 
   return {
     isPlayingAudio,

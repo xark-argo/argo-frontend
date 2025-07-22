@@ -20,7 +20,7 @@ export interface IBotDetail {
 }
 export const bellaBotDetail = atom<IBotDetail>()
 
-export const bellaAction = atom<string>('idle')
+export const bellaAction = atom<string>('')
 
 export const bellaAffection = atom<number>(20)
 
