@@ -1,5 +1,5 @@
 import {useAtom, useAtomValue, useSetAtom} from 'jotai'
-import {useCallback, useEffect, useRef} from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 
 import {getBalleVideoConfig} from '~/lib/apis/bots'
 
@@ -16,6 +16,7 @@ function useVideoConfig() {
   const {content: streamContent} = useAtomValue(currentBellaMessage)
   const [videoConfig, setVideoConfig] = useAtom(bellaVideoConfig)
   const setTtsConfig = useSetAtom(bellaTtsConfig)
+  const [currentIdleIndex, setCurrentIdleIndex] = useState(0)
 
   const findVideo = useCallback(
     (actions: string) => {
@@ -32,15 +33,43 @@ function useVideoConfig() {
     [videoConfig]
   )
 
+  const findIdleVideo = useCallback(
+    (index?: number) => {
+      const idle = videoConfig.find((video) => video.actions.includes('idle'))
+      if (idle && idle.url.length > 0) {
+        const targetIndex = index !== undefined ? index : Math.floor(Math.random() * idle.url.length)
+        return idle.url[targetIndex]
+      }
+      return ''
+    },
+    [videoConfig]
+  )
+
   const playVideo = useCallback(
     (a: string) => {
       if (!videoRef.current || (a === action && a !== 'idle')) return
       const video = videoRef.current
-      video.src = findVideo(a)
-      video.loop = a === 'idle'
+      
+      if (a === 'idle') {
+        // idle状态使用随机轮播，不循环单个视频
+        const idleUrl = findIdleVideo()
+        video.src = idleUrl
+        video.loop = false
+        // 找到当前播放的idle视频索引
+        const idle = videoConfig.find((video) => video.actions.includes('idle'))
+        if (idle) {
+          const index = idle.url.indexOf(idleUrl)
+          setCurrentIdleIndex(index >= 0 ? index : 0)
+        }
+      } else {
+        // 非idle状态保持原有逻辑
+        video.src = findVideo(a)
+        video.loop = true
+      }
+      
       video.play().catch(() => {})
     },
-    [videoRef, findVideo, action]
+    [videoRef, findVideo, findIdleVideo, action, videoConfig]
   )
 
   useEffect(() => {
@@ -114,7 +143,33 @@ function useVideoConfig() {
   }, [setVideoConfig, setAction, setTtsConfig])
 
   const handleEnded = useCallback(() => {
-    if (action !== 'idle') {
+    if (action === 'idle') {
+      // idle状态播放结束后，随机选择下一个idle视频
+      if (videoRef.current) {
+        const idle = videoConfig.find((video) => video.actions.includes('idle'))
+        if (idle && idle.url.length > 1) {
+          // 确保不重复播放同一个视频
+          let nextIndex
+          do {
+            nextIndex = Math.floor(Math.random() * idle.url.length)
+          } while (nextIndex === currentIdleIndex && idle.url.length > 1)
+          
+          videoRef.current.src = idle.url[nextIndex]
+          videoRef.current.loop = false
+          setCurrentIdleIndex(nextIndex)
+          videoRef.current.play().catch((err) => {
+            console.error('Failed to play next idle video:', err)
+          })
+        } else if (idle && idle.url.length === 1) {
+          // 如果只有一个idle视频，重新播放
+          videoRef.current.src = idle.url[0]
+          videoRef.current.loop = false
+          videoRef.current.play().catch((err) => {
+            console.error('Failed to replay idle video:', err)
+          })
+        }
+      }
+    } else {
       // 非idle状态的视频播放结束后，继续循环当前 action
       if (videoRef.current) {
         videoRef.current.src = findVideo(action)
@@ -124,7 +179,7 @@ function useVideoConfig() {
         })
       }
     }
-  }, [action, findVideo, videoRef])
+  }, [action, findVideo, videoRef, videoConfig, currentIdleIndex])
 
   return {handleEnded, videoRef}
 }
