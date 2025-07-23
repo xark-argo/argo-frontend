@@ -6,14 +6,18 @@ import {getTTSVoice} from '~/lib/apis/bots'
 
 import {bellaAction, bellaTtsConfig, currentBellaMessage} from '../atoms'
 
+// 音频项接口
+interface AudioItem {
+  sentence: string
+  audioUrl: string | null
+  isGenerating: boolean
+  isReady: boolean
+  domKeys: string[]
+}
+
 function useTTS() {
-  const playIndex = useRef(0)
-  const [{content: sentences, role}, setCurrentMessage] =
-    useAtom(currentBellaMessage)
-  const sentencesRef = useRef<string[]>([])
-  const audioRef = useRef<HTMLAudioElement | null>(new Audio())
+  const [{content: sentences, role}, setCurrentMessage] = useAtom(currentBellaMessage)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false)
-  const hasStartedRef = useRef(false)
   const setAction = useSetAtom(bellaAction)
   const {
     tts_type,
@@ -25,7 +29,12 @@ function useTTS() {
   const pendingTextRef = useRef<string>('')
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const processedTextRef = useRef<string>('') // 已处理的文本
-  const currentSentencesRef = useRef<string[]>([]) // 当前可播放的句子
+  
+  // 音频队列管理
+  const audioQueueRef = useRef<AudioItem[]>([])
+  const currentPlayingIndexRef = useRef<number>(0)
+  const audioRef = useRef<HTMLAudioElement | null>(new Audio())
+  const hasStartedRef = useRef(false)
 
   // 检查括号是否平衡
   const isBracketsBalanced = useCallback((text: string): boolean => {
@@ -57,53 +66,44 @@ function useTTS() {
     return openTags === closeTags
   }, [])
 
-  // 智能处理流式文本，等待括号完整
-  const processStreamingText = useCallback((text: string): string => {
-    let result = ''
-    let i = 0
-    let bracketCount = 0
-    
-    while (i < text.length) {
-      const char = text[i]
-      
-      if (char === '(' || char === '（') {
-        bracketCount++
-        i++
-      } else if (char === ')' || char === '）') {
-        bracketCount--
-        i++
-      } else {
-        if (bracketCount === 0) {
-          // 不在任何括号内，添加到结果
-          result += char
-        }
-        i++
-      }
-    }
-    
-    return result
-  }, [])
-
   // 移除display标签内容
   const removeDisplayTags = useCallback((text: string): string => {
-    // 使用简单但有效的方法：移除所有display标签及其内容
-    // 对于TTS来说，我们主要关注实际的对话内容，display标签通常是显示相关的
     return text.replace(/<display[^>]*>.*?<\/display>/gis, '')
   }, [])
 
-  // 移除括号内容并分割句子
+  // 移除括号内的描述性文字
+  const removeBracketContent = useCallback((text: string): string => {
+    // 移除中文括号 () 和英文括号 () 内的内容
+    return text
+      .replace(/（[^）]*）/g, '') // 中文括号
+      .replace(/\([^)]*\)/g, '') // 英文括号
+      .replace(/\s+/g, ' ') // 合并多个空格
+      .trim()
+  }, [])
+
+  // 处理文本并分割句子
   const processTextForTTS = useCallback((text: string): string[] => {
-    // 先处理流式文本中的括号
-    const processedText = processStreamingText(text)
     // 移除 <display>xxx</display> 内容
-    const noDisplayText = removeDisplayTags(processedText)
+    const noDisplayText = removeDisplayTags(text)
+    // 移除括号内的描述性文字
+    const noBracketText = removeBracketContent(noDisplayText)
     // 移除表情符号和其他不需要的内容
-    const finalText = noDisplayText.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}#\-*]/gu, '')
+    const finalText = noBracketText.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}#\-*]/gu, '')
+    
+    console.log('=== processTextForTTS Debug ===')
+    console.log('原始文本:', text)
+    console.log('移除display后:', noDisplayText)
+    console.log('移除括号后:', noBracketText)
+    console.log('最终文本:', finalText)
+    
     // 按句号、问号、感叹号、换行符分割
-    return finalText
+    const sentences = finalText
       .split(/[。？！?.!\n]/g)
       .filter((item) => item.trim() !== '')
-  }, [processStreamingText, removeDisplayTags])
+    
+    console.log('分割后的句子:', sentences)
+    return sentences
+  }, [removeDisplayTags, removeBracketContent])
 
   // 流式处理文本，提取新的可播放句子
   const processStreamingTextForTTS = useCallback((text: string): string[] => {
@@ -127,109 +127,152 @@ function useTTS() {
     return newSentences
   }, [processTextForTTS])
 
-  const getAudio = useCallback(async () => {
-    const sentence = currentSentencesRef.current[playIndex.current]
-
-    console.log('=== getAudio Debug ===')
-    console.log('当前播放索引:', playIndex.current)
-    console.log('句子数组:', currentSentencesRef.current)
-    console.log('当前句子:', sentence)
-
-    if (!sentence) {
-      // 没有更多句子，结束播放
-      console.log('没有更多句子，结束播放')
-      setCurrentMessage({
-        content: '',
-        role: 'assistant',
+  // 异步生成音频
+  const generateAudio = useCallback(async (sentence: string, index: number): Promise<string | null> => {
+    try {
+      console.log(`开始生成音频 ${index}:`, sentence)
+      
+      // 检查文本是否为空或只包含空白字符
+      if (!sentence.trim()) {
+        console.log(`句子 ${index} 为空，跳过TTS调用`)
+        return null
+      }
+      
+      const {data: ttsVoice} = await getTTSVoice({
+        tts_type,
+        tts_params: {
+          voice: tts_voice,
+          text: sentence,
+        },
       })
-      setAction('idle')
+
+      if (ttsVoice) {
+        console.log(`音频 ${index} 生成成功`)
+        return `data:audio/wav;base64,${ttsVoice}`
+      } else {
+        console.log(`音频 ${index} 生成失败`)
+        return null
+      }
+    } catch (error) {
+      console.error(`音频 ${index} 生成错误:`, error)
+      return null
+    }
+  }, [tts_type, tts_voice])
+
+  // 播放音频
+  const playAudio = useCallback(async (audioItem: AudioItem) => {
+    if (!audioItem.audioUrl || !audioRef.current) {
+      console.log('音频URL为空或音频对象不存在，跳过播放')
+      return false
+    }
+
+    try {
+      console.log('开始播放音频:', audioItem.sentence)
+      audioRef.current.src = audioItem.audioUrl
+      setIsPlayingAudio(true)
+      await audioRef.current.play()
+      return true
+    } catch (error) {
+      console.error('播放音频失败:', error)
+      return false
+    }
+  }, [])
+
+  // 播放队列中的下一个音频
+  const playNextAudio = useCallback(async () => {
+    // 查找下一个可播放的音频
+    let nextIndex = currentPlayingIndexRef.current
+    while (nextIndex < audioQueueRef.current.length) {
+      const audioItem = audioQueueRef.current[nextIndex]
+      if (audioItem.isReady && audioItem.audioUrl) {
+        break
+      }
+      nextIndex++
+    }
+
+    if (nextIndex >= audioQueueRef.current.length) {
+      // 没有更多可播放的音频
+      console.log('没有更多可播放的音频')
       setIsPlayingAudio(false)
+      hasStartedRef.current = false
       return
     }
 
-    const domKeys = [`bella-tts-${playIndex.current}`]
+    currentPlayingIndexRef.current = nextIndex
+    const audioItem = audioQueueRef.current[nextIndex]
+    
+         // 设置播放结束回调
+     if (audioRef.current) {
+       audioRef.current.onended = () => {
+         // 播放下一个
+         currentPlayingIndexRef.current++
+         playNextAudio()
+       }
+     }
 
-    // 合并短句子
-    let cleanedSentence = sentence
-    let currentIndex = playIndex.current
+    // 播放当前音频
+    await playAudio(audioItem)
+  }, [playAudio])
 
-    while (
-      cleanedSentence.length < 10 &&
-      currentIndex < currentSentencesRef.current.length - 1
-    ) {
-      currentIndex++
-      const nextSentence = currentSentencesRef.current[currentIndex] || ''
-      domKeys.push(`bella-tts-${currentIndex}`)
-      cleanedSentence += nextSentence
-    }
+  // 处理新的句子
+  const processNewSentences = useCallback(async (newSentences: string[]) => {
+    if (newSentences.length === 0) return
 
-    console.log('清理后的句子:', cleanedSentence)
+    // 为每个新句子创建音频项
+    for (let i = 0; i < newSentences.length; i++) {
+      const sentence = newSentences[i]
+      const queueIndex = audioQueueRef.current.length
+      
+      // 创建音频项
+      const audioItem: AudioItem = {
+        sentence,
+        audioUrl: null,
+        isGenerating: true,
+        isReady: false,
+        domKeys: [`bella-tts-${queueIndex}`]
+      }
+      
+      audioQueueRef.current.push(audioItem)
 
-    function onPlayEnded() {
-      domKeys.forEach((key) => {
-        const el = document.getElementById(key)
-        if (el) {
-          // 添加淡出动画类
-          el.classList.add('fade-out')
-          // 动画结束后移除元素
-          el.addEventListener(
-            'transitionend',
-            () => {
-              el.classList.add('hidden')
-            },
-            {once: true}
-          )
-          el.style.opacity = '0'
+      // 异步生成音频
+      generateAudio(sentence, queueIndex).then((audioUrl) => {
+        audioItem.audioUrl = audioUrl
+        audioItem.isGenerating = false
+        audioItem.isReady = true
+
+        // 如果这是第一个音频且还没有开始播放，开始播放
+        if (queueIndex === 0 && !hasStartedRef.current) {
+          hasStartedRef.current = true
+          playNextAudio()
+        }
+        // 如果当前正在播放且这是下一个要播放的音频，立即播放
+        else if (queueIndex === currentPlayingIndexRef.current && isPlayingAudio) {
+          playNextAudio()
         }
       })
-      
-      // 更新播放索引
-      playIndex.current = currentIndex + 1
-
-      if (playIndex.current < currentSentencesRef.current.length) {
-        getAudio()
-      } else {
-        // 播放完成，重置状态
-        console.log('播放完成，重置状态')
-        currentSentencesRef.current = []
-        playIndex.current = 0
-        setIsPlayingAudio(false)
-        hasStartedRef.current = false
-      }
     }
+  }, [generateAudio, playNextAudio, isPlayingAudio])
 
-    console.log('调用TTS API，文本:', cleanedSentence)
-    
-    // 检查文本是否为空或只包含空白字符
-    if (!cleanedSentence.trim()) {
-      console.log('文本为空，跳过TTS调用，继续下一句')
-      onPlayEnded()
-      return
+  // 重置TTS状态
+  const reset = useCallback(() => {
+    audioQueueRef.current = []
+    currentPlayingIndexRef.current = 0
+    setIsPlayingAudio(false)
+    hasStartedRef.current = false
+    lastProcessedIndexRef.current = 0
+    pendingTextRef.current = ''
+    processedTextRef.current = ''
+    if (processingTimeoutRef.current) {
+      clearTimeout(processingTimeoutRef.current)
+      processingTimeoutRef.current = null
     }
-    
-    const {data: ttsVoice} = await getTTSVoice({
-      tts_type,
-      tts_params: {
-        voice: tts_voice,
-        text: cleanedSentence,
-      },
-    })
-
-    const audio = audioRef.current
-    if (!audio || !ttsVoice) {
-      console.log('TTS API返回失败或音频对象不存在，继续下一句')
-      onPlayEnded()
-      return
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
     }
+  }, [])
 
-    console.log('TTS API成功，开始播放音频')
-    audio.src = `data:audio/wav;base64,${ttsVoice}`
-    setIsPlayingAudio(true)
-    audio.play()
-
-    audio.onended = onPlayEnded
-  }, [setCurrentMessage, setAction, tts_type, tts_voice])
-
+  // 监听流式文本变化
   useEffect(() => {
     if (role !== 'assistant' || !sentences) {
       return
@@ -287,52 +330,29 @@ function useTTS() {
       }
 
       // 括号平衡且不在括号内，处理文本
-      const processedSentences = processTextForTTS(pendingTextRef.current)
-      console.log('处理后的句子:', processedSentences)
-      console.log('句子数量:', processedSentences.length)
+      const newSentences = processStreamingTextForTTS(pendingTextRef.current)
+      console.log('新的可播放句子:', newSentences)
       
-      if (processedSentences.length > 0) {
-        // 获取新的可播放句子
-        const newSentences = processStreamingTextForTTS(pendingTextRef.current)
-        console.log('新的可播放句子:', newSentences)
-        
-        if (newSentences.length > 0) {
-          // 添加新句子到当前播放列表
-          currentSentencesRef.current = [...currentSentencesRef.current, ...newSentences]
-
-          console.log('hasStartedRef.current:', hasStartedRef.current)
-          console.log('!isPlayingAudio:', !isPlayingAudio)
-
-          // 如果还没有开始播放，立即开始播放
-          if (!hasStartedRef.current && !isPlayingAudio) {
-            console.log('开始播放TTS')
-            hasStartedRef.current = true
-            setTimeout(getAudio, 200) // 减少延迟，更快开始播放
-          }
-        }
+      if (newSentences.length > 0) {
+        // 异步处理新句子
+        processNewSentences(newSentences)
         
         // 更新已处理文本
         processedTextRef.current = pendingTextRef.current
       }
     }, 200) // 减少延迟，更快响应流式内容
-  }, [sentences, role, isBracketsBalanced, isDisplayTagsComplete, processTextForTTS, processStreamingTextForTTS, getAudio, isPlayingAudio])
+  }, [sentences, role, isBracketsBalanced, isDisplayTagsComplete, processStreamingTextForTTS, processNewSentences])
 
   return {
     isPlayingAudio,
-    reset: () => {
-      currentSentencesRef.current = []
-      playIndex.current = 0
-      setIsPlayingAudio(false)
-      hasStartedRef.current = false
-      lastProcessedIndexRef.current = 0
-      pendingTextRef.current = ''
-      processedTextRef.current = ''
-      if (processingTimeoutRef.current) {
-        clearTimeout(processingTimeoutRef.current)
-        processingTimeoutRef.current = null
-      }
-    },
+    reset,
+    // 检查是否所有音频都播放完成
+    isAllAudioFinished: () => {
+      return !isPlayingAudio && audioQueueRef.current.length > 0 && 
+             currentPlayingIndexRef.current >= audioQueueRef.current.length
+    }
   }
 }
+
 export default useTTS
 

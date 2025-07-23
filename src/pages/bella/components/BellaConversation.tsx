@@ -1,7 +1,7 @@
 import {Message} from '@arco-design/web-react'
 import {fetchEventSource} from '@microsoft/fetch-event-source'
 import {useAtom, useAtomValue, useSetAtom} from 'jotai'
-import React, {useRef, useState} from 'react'
+import React, {useEffect, useRef, useState} from 'react'
 import {useTranslation} from 'react-i18next'
 import {useHistory, useParams} from 'react-router-dom'
 
@@ -21,14 +21,44 @@ function BellaConversation() {
   const [isTyping, setIsTyping] = useState(false)
   const [currentMessage, setCurrentMessage] = useAtom(currentBellaMessage)
   const [inputValue, setInputValue] = useState('')
+  const [showMessage, setShowMessage] = useState(false)
+  const [hideTimeout, setHideTimeout] = useState<NodeJS.Timeout | null>(null)
+  const shouldHideMessageRef = useRef(false)
 
   const sourceRef = useRef<AbortController | null>(null)
 
-  const {reset} = useTTS()
+  const {reset, isPlayingAudio, isAllAudioFinished} = useTTS()
 
   // 发送消息
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isTyping) return
+    
+    // 清除之前的隐藏定时器
+    if (hideTimeout) {
+      clearTimeout(hideTimeout)
+      setHideTimeout(null)
+    }
+    
+    // 重置隐藏标志
+    shouldHideMessageRef.current = false
+    
+    // 重置消息容器样式，确保新消息能正常显示
+    const messageContainer = document.getElementById('bella-message-container')
+    if (messageContainer) {
+      messageContainer.classList.remove('fade-out', 'hidden')
+      messageContainer.style.opacity = '1'
+    }
+    
+    // 立即显示用户输入
+    const message = inputValue.trim()
+    setCurrentMessage({
+      content: message,
+      role: 'user',
+    })
+    setShowMessage(true)
+    setInputValue('')
+    setIsTyping(true)
+
     let cid = conversationId
     if (!conversationId) {
       const data = await createConversation()
@@ -37,14 +67,6 @@ function BellaConversation() {
       history.push(`/bella/${botDetail.id}/${data.id}`)
     }
     reset()
-
-    const message = inputValue.trim()
-    setCurrentMessage({
-      content: message,
-      role: 'user',
-    })
-    setInputValue('')
-    setIsTyping(true)
 
     // 触发视频动作
     setAction('think')
@@ -88,12 +110,19 @@ function BellaConversation() {
               content: buffer,
               role: 'assistant',
             })
+            setShowMessage(true)
             // setAction('optimism')
           }
           if (data.event === 'error') {
             Message.error(data.msg || 'Internal Server Error')
             setIsTyping(false)
             setAction('idle')
+            setShowMessage(false)
+            setCurrentMessage({
+              content: '',
+              role: 'assistant',
+            })
+            shouldHideMessageRef.current = false
           }
         },
         onerror: (err) => {
@@ -101,6 +130,12 @@ function BellaConversation() {
           Message.error('Connection error')
           setIsTyping(false)
           setAction('idle')
+          setShowMessage(false)
+          setCurrentMessage({
+            content: '',
+            role: 'assistant',
+          })
+          shouldHideMessageRef.current = false
         },
         onclose: () => {
           setIsTyping(false)
@@ -112,6 +147,12 @@ function BellaConversation() {
       Message.error('Failed to send message')
       setIsTyping(false)
       setAction('idle')
+      setShowMessage(false)
+      setCurrentMessage({
+        content: '',
+        role: 'assistant',
+      })
+      shouldHideMessageRef.current = false
     }
   }
 
@@ -123,32 +164,90 @@ function BellaConversation() {
     }
   }
 
+  // 监听 TTS 播放状态，当播放完成且所有流式消息都接收完毕时，延迟隐藏消息
+  useEffect(() => {
+    // 清除之前的定时器
+    if (hideTimeout) {
+      clearTimeout(hideTimeout)
+    }
+
+    // 如果 TTS 正在播放，不隐藏消息
+    if (isPlayingAudio) {
+      shouldHideMessageRef.current = false
+      return
+    }
+
+    // 只有当所有音频都播放完成且消息内容存在时才隐藏
+    if (!isPlayingAudio && isAllAudioFinished() && currentMessage.content && currentMessage.role === 'assistant' && !shouldHideMessageRef.current) {
+      shouldHideMessageRef.current = true
+      const timer = setTimeout(() => {
+        // 先让消息容器淡出
+        const messageContainer = document.getElementById('bella-message-container')
+        if (messageContainer) {
+          messageContainer.classList.add('fade-out')
+          messageContainer.addEventListener(
+            'transitionend',
+            () => {
+              messageContainer.classList.add('hidden')
+              // 淡出动画完成后，隐藏消息并清空内容
+              setShowMessage(false)
+              setCurrentMessage({
+                content: '',
+                role: 'assistant',
+              })
+              shouldHideMessageRef.current = false
+            },
+            {once: true}
+          )
+          messageContainer.style.opacity = '0'
+        } else {
+          // 如果找不到容器，直接隐藏
+          setShowMessage(false)
+          setCurrentMessage({
+            content: '',
+            role: 'assistant',
+          })
+          shouldHideMessageRef.current = false
+        }
+      }, 2000) // 延迟2秒
+
+      setHideTimeout(timer)
+    }
+
+    return () => {
+      if (hideTimeout) {
+        clearTimeout(hideTimeout)
+      }
+    }
+  }, [isPlayingAudio, currentMessage.content, currentMessage.role, hideTimeout, isAllAudioFinished])
+
   return (
     <div className="flex flex-col h-full">
       {/* 消息显示区域 */}
       <div className="flex-1 flex flex-col justify-end p-6">
-        <div className="mb-4 text-center">
-          <div
-            className={`inline-block bg-white/20 backdrop-blur-md rounded-2xl px-6 py-4 max-w-2xl ${
-              !currentMessage.content ? 'opacity-0' : 'opacity-100'
-            }`}
+        {showMessage && currentMessage.content && (
+          <div 
+            className="mb-4 text-center transition-opacity duration-300"
+            id="bella-message-container"
           >
-            <div
-              className="text-white text-lg font-medium max-h-[200px] overflow-y-auto"
-              id="bella-tts-text-container"
-            >
-              {currentMessage.content
-                .replace(/<display>.*?<\/display>/gis, '')
-                .split('\n')
-                .map((sentence, idx) => (
-                  // eslint-disable-next-line react/no-array-index-key
-                  <p key={`sentence-${idx}`} id={`bella-tts-${idx}`}>
-                    {sentence.trim()}
-                  </p>
-                ))}
+            <div className="inline-block bg-white/20 backdrop-blur-md rounded-2xl px-6 py-4 max-w-2xl">
+              <div
+                className="text-white text-lg font-medium max-h-[200px] overflow-y-auto"
+                id="bella-tts-text-container"
+              >
+                {currentMessage.content
+                  .replace(/<display>.*?<\/display>/gis, '')
+                  .split('\n')
+                  .map((sentence, idx) => (
+                    // eslint-disable-next-line react/no-array-index-key
+                    <p key={`sentence-${idx}`} id={`bella-tts-${idx}`}>
+                      {sentence.trim()}
+                    </p>
+                  ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* 输入框 */}
         <div className="mt-4">
