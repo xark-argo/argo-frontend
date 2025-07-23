@@ -24,6 +24,8 @@ function useTTS() {
   const lastProcessedIndexRef = useRef<number>(0)
   const pendingTextRef = useRef<string>('')
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const processedTextRef = useRef<string>('') // 已处理的文本
+  const currentSentencesRef = useRef<string[]>([]) // 当前可播放的句子
 
   // 检查括号是否平衡
   const isBracketsBalanced = useCallback((text: string): boolean => {
@@ -103,12 +105,34 @@ function useTTS() {
       .filter((item) => item.trim() !== '')
   }, [processStreamingText, removeDisplayTags])
 
+  // 流式处理文本，提取新的可播放句子
+  const processStreamingTextForTTS = useCallback((text: string): string[] => {
+    // 只处理新增的文本部分
+    const newText = text.slice(processedTextRef.current.length)
+
+    console.log('=== processStreamingTextForTTS Debug ===')
+    console.log('完整文本:', text)
+    console.log('已处理文本:', processedTextRef.current)
+    console.log('新增文本:', newText)
+
+    if (!newText.trim()) {
+      console.log('新增文本为空，返回空数组')
+      return []
+    }
+
+    // 处理新增文本
+    const newSentences = processTextForTTS(newText)
+    console.log('新增句子:', newSentences)
+
+    return newSentences
+  }, [processTextForTTS])
+
   const getAudio = useCallback(async () => {
-    const sentence = sentencesRef.current[playIndex.current]
+    const sentence = currentSentencesRef.current[playIndex.current]
 
     console.log('=== getAudio Debug ===')
     console.log('当前播放索引:', playIndex.current)
-    console.log('句子数组:', sentencesRef.current)
+    console.log('句子数组:', currentSentencesRef.current)
     console.log('当前句子:', sentence)
 
     if (!sentence) {
@@ -131,10 +155,10 @@ function useTTS() {
 
     while (
       cleanedSentence.length < 10 &&
-      currentIndex < sentencesRef.current.length - 1
+      currentIndex < currentSentencesRef.current.length - 1
     ) {
       currentIndex++
-      const nextSentence = sentencesRef.current[currentIndex] || ''
+      const nextSentence = currentSentencesRef.current[currentIndex] || ''
       domKeys.push(`bella-tts-${currentIndex}`)
       cleanedSentence += nextSentence
     }
@@ -161,13 +185,13 @@ function useTTS() {
       
       // 更新播放索引
       playIndex.current = currentIndex + 1
-      
-      if (playIndex.current < sentencesRef.current.length) {
+
+      if (playIndex.current < currentSentencesRef.current.length) {
         getAudio()
       } else {
         // 播放完成，重置状态
         console.log('播放完成，重置状态')
-        sentencesRef.current = []
+        currentSentencesRef.current = []
         playIndex.current = 0
         setIsPlayingAudio(false)
         hasStartedRef.current = false
@@ -224,7 +248,7 @@ function useTTS() {
       clearTimeout(processingTimeoutRef.current)
     }
 
-    // 设置延迟处理，确保流式文本完全接收
+    // 设置较短的延迟处理，实现流式处理
     processingTimeoutRef.current = setTimeout(() => {
       // 调试信息
       console.log('=== TTS Debug ===')
@@ -268,43 +292,41 @@ function useTTS() {
       console.log('句子数量:', processedSentences.length)
       
       if (processedSentences.length > 0) {
-        sentencesRef.current = processedSentences
+        // 获取新的可播放句子
+        const newSentences = processStreamingTextForTTS(pendingTextRef.current)
+        console.log('新的可播放句子:', newSentences)
         
-        console.log('hasStartedRef.current:', hasStartedRef.current)
-        console.log('processedSentences.length > 1:', processedSentences.length > 1)
-        console.log('!isPlayingAudio:', !isPlayingAudio)
-        
-        // 如果还没有开始播放且有足够的句子，开始播放
-        if (
-          !hasStartedRef.current &&
-          processedSentences.length > 1 &&
-          !isPlayingAudio
-        ) {
-          console.log('开始播放TTS')
-          hasStartedRef.current = true
-          setTimeout(getAudio, 800)
-        } else if (processedSentences.length === 1 && !hasStartedRef.current && !isPlayingAudio) {
-          // 如果只有一个句子，也尝试播放
-          console.log('单个句子，开始播放TTS')
-          hasStartedRef.current = true
-          setTimeout(getAudio, 800)
+        if (newSentences.length > 0) {
+          // 添加新句子到当前播放列表
+          currentSentencesRef.current = [...currentSentencesRef.current, ...newSentences]
+
+          console.log('hasStartedRef.current:', hasStartedRef.current)
+          console.log('!isPlayingAudio:', !isPlayingAudio)
+
+          // 如果还没有开始播放，立即开始播放
+          if (!hasStartedRef.current && !isPlayingAudio) {
+            console.log('开始播放TTS')
+            hasStartedRef.current = true
+            setTimeout(getAudio, 200) // 减少延迟，更快开始播放
+          }
         }
         
-        // 清空待处理文本
-        pendingTextRef.current = ''
+        // 更新已处理文本
+        processedTextRef.current = pendingTextRef.current
       }
-    }, 500) // 500ms延迟，确保流式文本完全接收
-  }, [sentences, role, isBracketsBalanced, isDisplayTagsComplete, processTextForTTS, getAudio, isPlayingAudio])
+    }, 200) // 减少延迟，更快响应流式内容
+  }, [sentences, role, isBracketsBalanced, isDisplayTagsComplete, processTextForTTS, processStreamingTextForTTS, getAudio, isPlayingAudio])
 
   return {
     isPlayingAudio,
     reset: () => {
-      sentencesRef.current = []
+      currentSentencesRef.current = []
       playIndex.current = 0
       setIsPlayingAudio(false)
       hasStartedRef.current = false
       lastProcessedIndexRef.current = 0
       pendingTextRef.current = ''
+      processedTextRef.current = ''
       if (processingTimeoutRef.current) {
         clearTimeout(processingTimeoutRef.current)
         processingTimeoutRef.current = null
