@@ -19,7 +19,7 @@ interface PlayQueueItem {
 function useVideoConfig() {
   const [action, setAction] = useAtom(bellaAction)
   const videoRef = useRef<HTMLVideoElement>(null)
-  const {content: streamContent} = useAtomValue(currentBellaMessage)
+  const {content: streamContent, role: messageRole} = useAtomValue(currentBellaMessage)
   const [videoConfig, setVideoConfig] = useAtom(bellaVideoConfig)
   const setTtsConfig = useSetAtom(bellaTtsConfig)
   const [currentIdleIndex, setCurrentIdleIndex] = useState(0)
@@ -314,6 +314,16 @@ function useVideoConfig() {
     // 更新最后处理的流内容
     lastStreamContentRef.current = streamContent
   }, [streamContent, addToPlayQueue])
+
+  // 监听消息角色变化，在用户发送新消息时重置已处理的action记录
+  useEffect(() => {
+    // 当角色变为 'user' 时，说明用户发送了新消息，需要重置已处理的action记录
+    if (messageRole === 'user') {
+      console.log('User sent new message, resetting processed actions')
+      processedActionsRef.current.clear()
+      lastStreamContentRef.current = ''
+    }
+  }, [messageRole])
 
   // 初始化视频配置
   useEffect(() => {
