@@ -177,13 +177,6 @@ function BellaConversation() {
       }
       
       statusCheckIntervalRef.current = setInterval(() => {
-        console.log('=== 定期检查状态 ===')
-        console.log('isPlayingAudio:', isPlayingAudio)
-        console.log('isAllAudioFinished():', isAllAudioFinished())
-        console.log('shouldHideMessageRef.current:', shouldHideMessageRef.current)
-        console.log('currentMessage.content:', currentMessage.content)
-        console.log('currentMessage.role:', currentMessage.role)
-        console.log('showMessage:', showMessage)
         
         // 检查所有条件
         const notPlaying = !isPlayingAudio
@@ -191,26 +184,16 @@ function BellaConversation() {
         const notAlreadyHiding = !shouldHideMessageRef.current
         const hasContent = currentMessage.content && currentMessage.role === 'assistant'
         
-        console.log('条件检查:')
-        console.log('- 不在播放状态:', notPlaying)
-        console.log('- 所有音频播放完成:', allFinished)
-        console.log('- 未在隐藏中:', notAlreadyHiding)
-        console.log('- 有消息内容:', hasContent)
-        
         // 如果播放停止且所有音频都播放完成，触发隐藏逻辑
         if (notPlaying && allFinished && notAlreadyHiding && hasContent) {
-          console.log('定期检查触发隐藏逻辑')
           shouldHideMessageRef.current = true
           const timer = setTimeout(() => {
-            console.log('开始执行隐藏逻辑')
             const messageContainer = document.getElementById('bella-message-container')
-            console.log('找到消息容器:', !!messageContainer)
             if (messageContainer) {
               messageContainer.classList.add('fade-out')
               messageContainer.addEventListener(
                 'transitionend',
                 () => {
-                  console.log('淡出动画完成，隐藏消息')
                   messageContainer.classList.add('hidden')
                   setShowMessage(false)
                   setCurrentMessage({
@@ -223,7 +206,6 @@ function BellaConversation() {
               )
               messageContainer.style.opacity = '0'
             } else {
-              console.log('未找到消息容器，直接隐藏')
               setShowMessage(false)
               setCurrentMessage({
                 content: '',
@@ -234,14 +216,10 @@ function BellaConversation() {
           }, 2000)
           setHideTimeout(timer)
         } else {
-          console.log('条件不满足，不触发隐藏逻辑')
           // 测试：如果音频播放完成但其他条件不满足，尝试强制隐藏
           if (notPlaying && allFinished && hasContent) {
-            console.log('测试：音频播放完成，尝试强制隐藏')
-            console.log('shouldHideMessageRef.current:', shouldHideMessageRef.current)
             // 如果已经在隐藏中，重置状态
             if (shouldHideMessageRef.current) {
-              console.log('重置隐藏状态')
               shouldHideMessageRef.current = false
             }
           }

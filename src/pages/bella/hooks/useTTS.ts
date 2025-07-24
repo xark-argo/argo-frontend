@@ -91,18 +91,11 @@ function useTTS() {
     // 移除表情符号和其他不需要的内容
     const finalText = noBracketText.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}#\-*]/gu, '')
     
-    console.log('=== processTextForTTS Debug ===')
-    console.log('原始文本:', text)
-    console.log('移除display后:', noDisplayText)
-    console.log('移除括号后:', noBracketText)
-    console.log('最终文本:', finalText)
-    
     // 按句号、问号、感叹号、换行符分割
     const sentences = finalText
       .split(/[。？！?.!\n]/g)
       .filter((item) => item.trim() !== '')
-    
-    console.log('分割后的句子:', sentences)
+
     return sentences
   }, [removeDisplayTags, removeBracketContent])
 
@@ -111,11 +104,6 @@ function useTTS() {
     // 只处理新增的文本部分
     const newText = text.slice(processedTextRef.current.length)
 
-    console.log('=== processStreamingTextForTTS Debug ===')
-    console.log('完整文本:', text)
-    console.log('已处理文本长度:', processedTextRef.current.length)
-    console.log('新增文本:', newText)
-
     if (!newText.trim()) {
       console.log('新增文本为空，返回空数组')
       return []
@@ -123,7 +111,6 @@ function useTTS() {
 
     // 处理新增文本
     const newSentences = processTextForTTS(newText)
-    console.log('新增句子:', newSentences)
 
     return newSentences
   }, [processTextForTTS])
@@ -131,8 +118,6 @@ function useTTS() {
   // 异步生成音频
   const generateAudio = useCallback(async (sentence: string, index: number): Promise<string | null> => {
     try {
-      console.log(`开始生成音频 ${index}:`, sentence)
-      
       // 检查文本是否为空或只包含空白字符
       if (!sentence.trim()) {
         console.log(`句子 ${index} 为空，跳过TTS调用`)
@@ -148,7 +133,6 @@ function useTTS() {
       })
 
       if (ttsVoice) {
-        console.log(`音频 ${index} 生成成功`)
         return `data:audio/wav;base64,${ttsVoice}`
       } else {
         console.log(`音频 ${index} 生成失败`)
@@ -201,7 +185,6 @@ function useTTS() {
 
     if (nextIndex >= audioQueueRef.current.length) {
       // 没有更多可播放的音频
-      console.log('没有更多可播放的音频，播放完成')
       setIsPlayingAudio(false)
       hasStartedRef.current = false
       // 标记消息已完成
@@ -233,7 +216,6 @@ function useTTS() {
     // 设置播放结束回调
     if (audioRef.current) {
       audioRef.current.onended = () => {
-        console.log('音频播放结束，播放下一个')
         // 播放下一个
         currentPlayingIndexRef.current++
         playNextAudio()
@@ -251,14 +233,10 @@ function useTTS() {
       return
     }
 
-    console.log('开始处理新句子，数量:', newSentences.length)
-
     // 为每个新句子创建音频项
     for (let i = 0; i < newSentences.length; i++) {
       const sentence = newSentences[i]
       const queueIndex = audioQueueRef.current.length
-      
-      console.log(`创建音频项 ${queueIndex}:`, sentence)
       
       // 创建音频项
       const audioItem: AudioItem = {
@@ -296,7 +274,6 @@ function useTTS() {
 
   // 重置TTS状态
   const reset = useCallback(() => {
-    console.log('重置TTS状态')
     audioQueueRef.current = []
     currentPlayingIndexRef.current = 0
     setIsPlayingAudio(false)
@@ -325,18 +302,12 @@ function useTTS() {
 
     // 如果消息已经完成，不再处理
     if (isMessageCompleteRef.current) {
-      console.log('消息已完成，跳过处理')
       return
     }
 
     // 检查是否有新的内容需要处理
     const newContent = sentences.slice(lastProcessedIndexRef.current)
     if (!newContent) return
-
-    console.log('=== 流式文本处理开始 ===')
-    console.log('当前完整文本:', sentences)
-    console.log('已处理长度:', lastProcessedIndexRef.current)
-    console.log('新增内容:', newContent)
 
     // 更新待处理文本
     pendingTextRef.current += newContent
@@ -349,10 +320,6 @@ function useTTS() {
 
     // 设置较短的延迟处理，实现流式处理
     processingTimeoutRef.current = setTimeout(() => {
-      // 调试信息
-      console.log('=== TTS 处理定时器触发 ===')
-      console.log('待处理文本:', pendingTextRef.current)
-      console.log('括号平衡:', isBracketsBalanced(pendingTextRef.current))
 
       // 检查括号是否平衡
       if (!isBracketsBalanced(pendingTextRef.current)) {
@@ -377,8 +344,6 @@ function useTTS() {
         }
       }
       
-      console.log('括号深度:', bracketCount)
-      
       if (bracketCount > 0) {
         console.log('还在括号内，等待更多内容')
         return
@@ -389,13 +354,11 @@ function useTTS() {
       console.log('新的可播放句子:', newSentences)
       
       if (newSentences.length > 0) {
-        console.log('开始处理新句子，数量:', newSentences.length)
         // 异步处理新句子
         processNewSentences(newSentences)
         
         // 更新已处理文本 - 这里只更新为当前待处理文本的长度
         processedTextRef.current = pendingTextRef.current
-        console.log('已处理文本更新为:', processedTextRef.current)
       } else {
         console.log('没有新的可播放句子')
       }
@@ -409,23 +372,12 @@ function useTTS() {
     isAllAudioFinished: () => {
       // 如果音频队列为空，说明已经播放完成并清空了
       if (audioQueueRef.current.length === 0) {
-        console.log('=== isAllAudioFinished Debug ===')
-        console.log('音频队列为空，播放完成')
         return true
       }
       
       const hasAudioQueue = audioQueueRef.current.length > 0
       const allAudioPlayed = currentPlayingIndexRef.current >= audioQueueRef.current.length
       const notPlaying = !isPlayingAudio
-      
-      console.log('=== isAllAudioFinished Debug ===')
-      console.log('音频队列长度:', audioQueueRef.current.length)
-      console.log('当前播放索引:', currentPlayingIndexRef.current)
-      console.log('是否正在播放:', isPlayingAudio)
-      console.log('有音频队列:', hasAudioQueue)
-      console.log('所有音频已播放:', allAudioPlayed)
-      console.log('不在播放状态:', notPlaying)
-      console.log('结果:', hasAudioQueue && allAudioPlayed && notPlaying)
       
       return hasAudioQueue && allAudioPlayed && notPlaying
     }
