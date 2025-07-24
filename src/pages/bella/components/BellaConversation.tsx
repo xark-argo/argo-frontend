@@ -24,6 +24,7 @@ function BellaConversation() {
   const [showMessage, setShowMessage] = useState(false)
   const [hideTimeout, setHideTimeout] = useState<NodeJS.Timeout | null>(null)
   const shouldHideMessageRef = useRef(false)
+  const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const sourceRef = useRef<AbortController | null>(null)
 
@@ -164,62 +165,105 @@ function BellaConversation() {
     }
   }
 
-  // 监听 TTS 播放状态，当播放完成且所有流式消息都接收完毕时，延迟隐藏消息
+
+
+  // 简化：只使用定期检查，移除复杂的 useEffect 逻辑
   useEffect(() => {
-    // 清除之前的定时器
-    if (hideTimeout) {
-      clearTimeout(hideTimeout)
-    }
-
-    // 如果 TTS 正在播放，不隐藏消息
-    if (isPlayingAudio) {
-      shouldHideMessageRef.current = false
-      return
-    }
-
-    // 只有当所有音频都播放完成且消息内容存在时才隐藏
-    if (!isPlayingAudio && isAllAudioFinished() && currentMessage.content && currentMessage.role === 'assistant' && !shouldHideMessageRef.current) {
-      shouldHideMessageRef.current = true
-      const timer = setTimeout(() => {
-        // 先让消息容器淡出
-        const messageContainer = document.getElementById('bella-message-container')
-        if (messageContainer) {
-          messageContainer.classList.add('fade-out')
-          messageContainer.addEventListener(
-            'transitionend',
-            () => {
-              messageContainer.classList.add('hidden')
-              // 淡出动画完成后，隐藏消息并清空内容
+    // 当有消息内容时，启动定期检查
+    if (currentMessage.content && currentMessage.role === 'assistant') {
+      // 清除之前的定时器
+      if (statusCheckIntervalRef.current) {
+        clearInterval(statusCheckIntervalRef.current)
+      }
+      
+      statusCheckIntervalRef.current = setInterval(() => {
+        console.log('=== 定期检查状态 ===')
+        console.log('isPlayingAudio:', isPlayingAudio)
+        console.log('isAllAudioFinished():', isAllAudioFinished())
+        console.log('shouldHideMessageRef.current:', shouldHideMessageRef.current)
+        console.log('currentMessage.content:', currentMessage.content)
+        console.log('currentMessage.role:', currentMessage.role)
+        console.log('showMessage:', showMessage)
+        
+        // 检查所有条件
+        const notPlaying = !isPlayingAudio
+        const allFinished = isAllAudioFinished()
+        const notAlreadyHiding = !shouldHideMessageRef.current
+        const hasContent = currentMessage.content && currentMessage.role === 'assistant'
+        
+        console.log('条件检查:')
+        console.log('- 不在播放状态:', notPlaying)
+        console.log('- 所有音频播放完成:', allFinished)
+        console.log('- 未在隐藏中:', notAlreadyHiding)
+        console.log('- 有消息内容:', hasContent)
+        
+        // 如果播放停止且所有音频都播放完成，触发隐藏逻辑
+        if (notPlaying && allFinished && notAlreadyHiding && hasContent) {
+          console.log('定期检查触发隐藏逻辑')
+          shouldHideMessageRef.current = true
+          const timer = setTimeout(() => {
+            console.log('开始执行隐藏逻辑')
+            const messageContainer = document.getElementById('bella-message-container')
+            console.log('找到消息容器:', !!messageContainer)
+            if (messageContainer) {
+              messageContainer.classList.add('fade-out')
+              messageContainer.addEventListener(
+                'transitionend',
+                () => {
+                  console.log('淡出动画完成，隐藏消息')
+                  messageContainer.classList.add('hidden')
+                  setShowMessage(false)
+                  setCurrentMessage({
+                    content: '',
+                    role: 'assistant',
+                  })
+                  shouldHideMessageRef.current = false
+                },
+                {once: true}
+              )
+              messageContainer.style.opacity = '0'
+            } else {
+              console.log('未找到消息容器，直接隐藏')
               setShowMessage(false)
               setCurrentMessage({
                 content: '',
                 role: 'assistant',
               })
               shouldHideMessageRef.current = false
-            },
-            {once: true}
-          )
-          messageContainer.style.opacity = '0'
+            }
+          }, 2000)
+          setHideTimeout(timer)
         } else {
-          // 如果找不到容器，直接隐藏
-          setShowMessage(false)
-          setCurrentMessage({
-            content: '',
-            role: 'assistant',
-          })
-          shouldHideMessageRef.current = false
+          console.log('条件不满足，不触发隐藏逻辑')
+          // 测试：如果音频播放完成但其他条件不满足，尝试强制隐藏
+          if (notPlaying && allFinished && hasContent) {
+            console.log('测试：音频播放完成，尝试强制隐藏')
+            console.log('shouldHideMessageRef.current:', shouldHideMessageRef.current)
+            // 如果已经在隐藏中，重置状态
+            if (shouldHideMessageRef.current) {
+              console.log('重置隐藏状态')
+              shouldHideMessageRef.current = false
+            }
+          }
         }
-      }, 2000) // 延迟2秒
-
-      setHideTimeout(timer)
+      }, 500) // 每500ms检查一次
+    } else {
+      // 停止定期检查
+      if (statusCheckIntervalRef.current) {
+        clearInterval(statusCheckIntervalRef.current)
+        statusCheckIntervalRef.current = null
+      }
     }
 
     return () => {
-      if (hideTimeout) {
-        clearTimeout(hideTimeout)
+      if (statusCheckIntervalRef.current) {
+        clearInterval(statusCheckIntervalRef.current)
+        statusCheckIntervalRef.current = null
       }
     }
-  }, [isPlayingAudio, currentMessage.content, currentMessage.role, hideTimeout, isAllAudioFinished])
+  }, [currentMessage.content, currentMessage.role, isPlayingAudio])
+
+
 
   return (
     <div className="flex flex-col h-full">
