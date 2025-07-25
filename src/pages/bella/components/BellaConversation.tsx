@@ -23,25 +23,50 @@ function BellaConversation() {
   const [inputValue, setInputValue] = useState('')
   const [showMessage, setShowMessage] = useState(false)
   const [hideTimeout, setHideTimeout] = useState<NodeJS.Timeout | null>(null)
-  const shouldHideMessageRef = useRef(false)
-  const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const sourceRef = useRef<AbortController | null>(null)
 
   const {reset, isPlayingAudio, isAllAudioFinished} = useTTS()
 
+  // 隐藏消息的函数
+  const hideMessage = () => {
+    const messageContainer = document.getElementById('bella-message-container')
+    if (messageContainer) {
+      messageContainer.classList.add('fade-out')
+      messageContainer.addEventListener(
+        'transitionend',
+        () => {
+          messageContainer.classList.add('hidden')
+          setShowMessage(false)
+          setCurrentMessage({
+            content: '',
+            role: 'assistant',
+          })
+        },
+        {once: true}
+      )
+      messageContainer.style.opacity = '0'
+    } else {
+      setShowMessage(false)
+      setCurrentMessage({
+        content: '',
+        role: 'assistant',
+      })
+    }
+  }
+
   // 发送消息
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isTyping) return
+    
+    // 立即清理TTS状态，避免播放上次对话的音频
+    reset()
     
     // 清除之前的隐藏定时器
     if (hideTimeout) {
       clearTimeout(hideTimeout)
       setHideTimeout(null)
     }
-    
-    // 重置隐藏标志
-    shouldHideMessageRef.current = false
     
     // 重置消息容器样式，确保新消息能正常显示
     const messageContainer = document.getElementById('bella-message-container')
@@ -67,7 +92,6 @@ function BellaConversation() {
       cid = data.id
       history.push(`/bella/${botDetail.id}/${data.id}`)
     }
-    reset()
 
     // 触发视频动作
     setAction('think')
@@ -104,7 +128,7 @@ function BellaConversation() {
         },
         onmessage: async (event) => {
           const data = JSON.parse(event.data || '{}')
-          // 新增：流式内容传递给上层
+          // 流式内容传递给上层
           if (data.event === 'message') {
             buffer += data.answer || ''
             setCurrentMessage({
@@ -112,7 +136,14 @@ function BellaConversation() {
               role: 'assistant',
             })
             setShowMessage(true)
-            // setAction('optimism')
+          }
+          // 流式对话结束，设置延迟隐藏
+          if (data.event === 'message_end') {
+            console.log('流式对话结束，设置延迟隐藏')
+            const timer = setTimeout(() => {
+              hideMessage()
+            }, 8000) // 8秒后隐藏
+            setHideTimeout(timer)
           }
           if (data.event === 'error') {
             Message.error(data.msg || 'Internal Server Error')
@@ -123,7 +154,6 @@ function BellaConversation() {
               content: '',
               role: 'assistant',
             })
-            shouldHideMessageRef.current = false
           }
         },
         onerror: (err) => {
@@ -136,10 +166,15 @@ function BellaConversation() {
             content: '',
             role: 'assistant',
           })
-          shouldHideMessageRef.current = false
         },
         onclose: () => {
+          console.log('流式连接关闭')
           setIsTyping(false)
+          // 连接关闭时也设置延迟隐藏
+          const timer = setTimeout(() => {
+            hideMessage()
+          }, 8000) // 8秒后隐藏
+          setHideTimeout(timer)
         },
         openWhenHidden: true,
       })
@@ -153,7 +188,6 @@ function BellaConversation() {
         content: '',
         role: 'assistant',
       })
-      shouldHideMessageRef.current = false
     }
   }
 
@@ -165,82 +199,14 @@ function BellaConversation() {
     }
   }
 
-
-
-  // 简化：只使用定期检查，移除复杂的 useEffect 逻辑
+  // 清理定时器
   useEffect(() => {
-    // 当有消息内容时，启动定期检查
-    if (currentMessage.content && currentMessage.role === 'assistant') {
-      // 清除之前的定时器
-      if (statusCheckIntervalRef.current) {
-        clearInterval(statusCheckIntervalRef.current)
-      }
-      
-      statusCheckIntervalRef.current = setInterval(() => {
-        
-        // 检查所有条件
-        const notPlaying = !isPlayingAudio
-        const allFinished = isAllAudioFinished()
-        const notAlreadyHiding = !shouldHideMessageRef.current
-        const hasContent = currentMessage.content && currentMessage.role === 'assistant'
-        
-        // 如果播放停止且所有音频都播放完成，触发隐藏逻辑
-        if (notPlaying && allFinished && notAlreadyHiding && hasContent) {
-          shouldHideMessageRef.current = true
-          const timer = setTimeout(() => {
-            const messageContainer = document.getElementById('bella-message-container')
-            if (messageContainer) {
-              messageContainer.classList.add('fade-out')
-              messageContainer.addEventListener(
-                'transitionend',
-                () => {
-                  messageContainer.classList.add('hidden')
-                  setShowMessage(false)
-                  setCurrentMessage({
-                    content: '',
-                    role: 'assistant',
-                  })
-                  shouldHideMessageRef.current = false
-                },
-                {once: true}
-              )
-              messageContainer.style.opacity = '0'
-            } else {
-              setShowMessage(false)
-              setCurrentMessage({
-                content: '',
-                role: 'assistant',
-              })
-              shouldHideMessageRef.current = false
-            }
-          }, 2000)
-          setHideTimeout(timer)
-        } else {
-          // 测试：如果音频播放完成但其他条件不满足，尝试强制隐藏
-          if (notPlaying && allFinished && hasContent) {
-            // 如果已经在隐藏中，重置状态
-            if (shouldHideMessageRef.current) {
-              shouldHideMessageRef.current = false
-            }
-          }
-        }
-      }, 500) // 每500ms检查一次
-    } else {
-      // 停止定期检查
-      if (statusCheckIntervalRef.current) {
-        clearInterval(statusCheckIntervalRef.current)
-        statusCheckIntervalRef.current = null
-      }
-    }
-
     return () => {
-      if (statusCheckIntervalRef.current) {
-        clearInterval(statusCheckIntervalRef.current)
-        statusCheckIntervalRef.current = null
+      if (hideTimeout) {
+        clearTimeout(hideTimeout)
       }
     }
-  }, [currentMessage.content, currentMessage.role, isPlayingAudio])
-
+  }, [hideTimeout])
 
 
   return (
