@@ -20,16 +20,16 @@ export interface IBotDetail {
 }
 export const bellaBotDetail = atom<IBotDetail>()
 
-export const bellaAction = atom<string>('')
-
 export const bellaAffection = atom<number>(20)
 
 export const currentBellaMessage = atom<{
   content: string
   role: 'user' | 'assistant'
+  is_end: boolean
 }>({
   content: '',
   role: 'assistant',
+  is_end: false,
 })
 
 export const bellaVideoConfig = atom<

@@ -1,27 +1,16 @@
-import {useAtom, useAtomValue, useSetAtom} from 'jotai'
-import {useCallback, useEffect, useRef, useState} from 'react'
+import {useAtomValue, useSetAtom} from 'jotai'
+import {useCallback, useEffect, useRef} from 'react'
 
 import {getBalleVideoConfig} from '~/lib/apis/bots'
 
-import {
-  bellaTtsConfig,
-  bellaVideoConfig,
-  currentBellaMessage,
-} from '../atoms'
-
-// 播放队列项接口
-interface PlayQueueItem {
-  action: string
-  url: string
-}
+import {bellaTtsConfig, currentBellaMessage} from '../atoms'
 
 function useVideoConfig() {
-
-  const {content: streamContent, role: messageRole} = useAtomValue(currentBellaMessage)
+  const {content: streamContent} = useAtomValue(currentBellaMessage)
 
   const videoRef = useRef<HTMLVideoElement>(null)
-  const videoConfig = useRef<{actions: string, url: string[]}[]>([])
-  const streamActionConfigs =useRef(new Set<string>())
+  const videoConfig = useRef<{actions: string; url: string[]}[]>([])
+  const streamActionConfigs = useRef(new Set<string>())
   const nextAction = useRef<string[]>([])
 
   const setTtsConfig = useSetAtom(bellaTtsConfig)
@@ -29,45 +18,55 @@ function useVideoConfig() {
   const onPlayVideo = useCallback((currentAction: string, urls: string[]) => {
     const videoDom = videoRef.current
     if (!videoDom || !urls.length) {
-      console.log('videoDom is null or urls is empty')
+      console.info('videoDom is null or urls is empty')
       return
     }
-
-    console.log(`video change, next action is ${currentAction}, urls is`, urls)
-    videoDom.src = urls[0]
+    console.info('onPlayVideo', currentAction, urls[0])
+    videoDom.src = urls[0]!
     videoDom.style.opacity = '1'
-    videoDom.addEventListener('loadeddata', () => {
-      videoDom.play()
-    }, {once: true})
+    videoDom.addEventListener(
+      'loadeddata',
+      () => {
+        videoDom.play()
+      },
+      {once: true}
+    )
 
-    videoDom.addEventListener('ended', () => {
-      videoDom.style.opacity = '0'
-      setTimeout(() => {
-        if (nextAction.current.length) {
-          const action = nextAction.current.shift()
-          const actionUrls = videoConfig.current.find(item => item.actions === action)?.url ?? []
-          if (action && actionUrls.length) {
-            onPlayVideo(action, actionUrls)
-            return
+    videoDom.addEventListener(
+      'ended',
+      () => {
+        videoDom.style.opacity = '0'
+        setTimeout(() => {
+          if (nextAction.current.length) {
+            const action = nextAction.current.shift()
+            const actionUrls =
+              videoConfig.current.find(item => item.actions.includes(action))
+                ?.url ?? []
+            if (action && actionUrls.length) {
+              onPlayVideo(action, actionUrls)
+              return
+            }
           }
-        }
-        if (urls.length > 1) {
-          onPlayVideo(currentAction, urls.slice(1))
-        }
-        if (urls.length === 1) {
-          const idleUrls = videoConfig.current.find(item => item.actions === 'idle')?.url
-          if (idleUrls) {
-            onPlayVideo('idle', idleUrls)
+          if (urls.length > 1) {
+            onPlayVideo(currentAction, urls.slice(1))
           }
-        }
-      }, 300)
-    }, {once: true})
+          if (urls.length === 1) {
+            const idleUrls = videoConfig.current.find(
+              item => item.actions === 'idle'
+            )?.url
+            if (idleUrls) {
+              onPlayVideo('idle', idleUrls)
+            }
+          }
+        }, 300)
+      },
+      {once: true}
+    )
   }, [])
-
 
   useEffect(() => {
     const videoCacheElements: HTMLVideoElement[] = []
-    getBalleVideoConfig().then((res) => {
+    getBalleVideoConfig().then(res => {
       const videos = []
       // 选择角色（目前选择第0个，后续可扩展选择逻辑）
       const selectedRole = res?.[0]
@@ -75,11 +74,11 @@ function useVideoConfig() {
         console.warn('No role data found')
         return
       }
-      
+
       const role = selectedRole.name ?? 'ani'
       const baseUrl = `${window.location.origin}/api/files/resources/characters/${role}/`
       const idleUrls = []
-      
+
       // 配置 TTS 参数
       const ttsConfig = {
         tts_type: selectedRole.tts_type ?? 'edge_tts',
@@ -89,14 +88,14 @@ function useVideoConfig() {
       }
 
       setTtsConfig(ttsConfig)
-      
+
       // 只收集选中角色的 idle 视频
       if (selectedRole.emotion_idle) {
-        selectedRole.emotion_idle.forEach((idle) => {
+        selectedRole.emotion_idle.forEach(idle => {
           idleUrls.push(`${baseUrl}${idle}`)
         })
       }
-      
+
       // 添加 idle 视频配置
       videos.push({
         actions: 'idle',
@@ -105,17 +104,17 @@ function useVideoConfig() {
 
       // 只添加选中角色的其他情感视频配置
       if (selectedRole.emotionMap) {
-        Object.keys(selectedRole.emotionMap).forEach((emotion) => {
+        Object.keys(selectedRole.emotionMap).forEach(emotion => {
           videos.push({
             actions: selectedRole.emotionMap[emotion].join(','),
             url: [`${baseUrl}${emotion}`],
           })
         })
       }
-      
+
       // 预加载所有视频
-      videos.forEach((video) => {
-        video.url.forEach((url) => {
+      videos.forEach(video => {
+        video.url.forEach(url => {
           const videoEl = document.createElement('video')
           videoEl.preload = 'auto'
           videoEl.src = url
@@ -124,18 +123,18 @@ function useVideoConfig() {
           videoCacheElements.push(videoEl)
         })
       })
-      
+
       videoConfig.current = videos
-      
+
       onPlayVideo('idle', idleUrls)
     })
-  }, [])
+  }, [onPlayVideo, setTtsConfig])
 
   useEffect(() => {
     const matches = streamContent.match(/<display>(.*?)<\/display>/g)
     const actionConfigs = streamActionConfigs.current
     if (matches) {
-      console.log('Found display matches:', matches)
+      console.info('Found display matches:', matches)
       matches.forEach(match => {
         const actionMatch = match.match(/<display>(.*?)<\/display>/)
         if (actionMatch?.[1]) {
@@ -144,23 +143,26 @@ function useVideoConfig() {
           const actionKey = `${action}-${match}`
           if (!actionConfigs.has(actionKey)) {
             actionConfigs.add(actionKey)
-            console.log('Processing new action:', action, 'from stream content length:', streamContent.length)
+            console.info(
+              'Processing new action:',
+              action,
+              'from stream content length:',
+              streamContent.length
+            )
             nextAction.current.push(action)
           } else {
-            console.log('Skipping already processed action:', action)
+            console.info('Skipping already processed action:', action)
           }
         }
       })
     } else {
-      console.log('No display matches found in current content')
+      console.info('No display matches found in current content')
     }
   }, [streamContent])
 
-
   return {
-    videoRef
+    videoRef,
   }
-
 }
 
 export default useVideoConfig

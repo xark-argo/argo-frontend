@@ -13,7 +13,7 @@ export function splitSentences(text: string) {
 
   return text
     .split(regex)
-    .map((s) => s.trim())
+    .map(s => s.trim())
     .filter(Boolean)
 }
 
@@ -24,7 +24,7 @@ export function splitSentences(text: string) {
  */
 export function toHex(str: string) {
   return Array.from(new TextEncoder().encode(str))
-    .map((b) => b.toString(16).padStart(2, '0'))
+    .map(b => b.toString(16).padStart(2, '0'))
     .join('')
 }
 
@@ -34,6 +34,6 @@ export function toHex(str: string) {
  * @returns string
  */
 export function fromHex(hex: string) {
-  const bytes = new Uint8Array(hex.match(/../g).map((b) => parseInt(b, 16)))
+  const bytes = new Uint8Array(hex.match(/../g).map(b => parseInt(b, 16)))
   return new TextDecoder().decode(bytes)
 }

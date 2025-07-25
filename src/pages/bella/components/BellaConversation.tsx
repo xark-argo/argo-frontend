@@ -1,85 +1,48 @@
 import {Message} from '@arco-design/web-react'
 import {fetchEventSource} from '@microsoft/fetch-event-source'
-import {useAtom, useAtomValue, useSetAtom} from 'jotai'
-import React, {useEffect, useRef, useState} from 'react'
+import {useAtom, useAtomValue} from 'jotai'
+import React, {useMemo, useRef, useState} from 'react'
 import {useTranslation} from 'react-i18next'
 import {useHistory, useParams} from 'react-router-dom'
 
 import {createConversation} from '~/lib/apis/conversations'
 import {WEBUI_API_BASE_URL} from '~/lib/constants'
 
-import {bellaAction, bellaBotDetail, currentBellaMessage} from '../atoms'
+import {bellaBotDetail, currentBellaMessage} from '../atoms'
 import useTTS from '../hooks/useTTS'
 // import AudioRecorderButton from './AudioRecorderButton'
 
 function BellaConversation() {
+  useTTS()
   const {t} = useTranslation()
   const botDetail = useAtomValue(bellaBotDetail)
-  const setAction = useSetAtom(bellaAction)
+
   const {conversationId} = useParams<{conversationId?: string}>()
   const history = useHistory()
   const [isTyping, setIsTyping] = useState(false)
   const [currentMessage, setCurrentMessage] = useAtom(currentBellaMessage)
   const [inputValue, setInputValue] = useState('')
   const [showMessage, setShowMessage] = useState(false)
-  const [hideTimeout, setHideTimeout] = useState<NodeJS.Timeout | null>(null)
 
   const sourceRef = useRef<AbortController | null>(null)
-
-  const {reset, isPlayingAudio, isAllAudioFinished} = useTTS()
-
-  // 隐藏消息的函数
-  const hideMessage = () => {
-    const messageContainer = document.getElementById('bella-message-container')
-    if (messageContainer) {
-      messageContainer.classList.add('fade-out')
-      messageContainer.addEventListener(
-        'transitionend',
-        () => {
-          messageContainer.classList.add('hidden')
-          setShowMessage(false)
-          setCurrentMessage({
-            content: '',
-            role: 'assistant',
-          })
-        },
-        {once: true}
-      )
-      messageContainer.style.opacity = '0'
-    } else {
-      setShowMessage(false)
-      setCurrentMessage({
-        content: '',
-        role: 'assistant',
-      })
-    }
-  }
 
   // 发送消息
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isTyping) return
-    
-    // 立即清理TTS状态，避免播放上次对话的音频
-    reset()
-    
-    // 清除之前的隐藏定时器
-    if (hideTimeout) {
-      clearTimeout(hideTimeout)
-      setHideTimeout(null)
-    }
-    
+
     // 重置消息容器样式，确保新消息能正常显示
     const messageContainer = document.getElementById('bella-message-container')
     if (messageContainer) {
       messageContainer.classList.remove('fade-out', 'hidden')
       messageContainer.style.opacity = '1'
     }
-    
+
     // 立即显示用户输入
     const message = inputValue.trim()
     setCurrentMessage({
       content: message,
       role: 'user',
+      is_end: true,
     })
     setShowMessage(true)
     setInputValue('')
@@ -93,9 +56,6 @@ function BellaConversation() {
       history.push(`/bella/${botDetail.id}/${data.id}`)
     }
 
-    // 触发视频动作
-    setAction('think')
-
     const params = {
       invoke_from: 'web-app',
       message,
@@ -105,7 +65,6 @@ function BellaConversation() {
     }
 
     sourceRef.current = new AbortController()
-    let buffer = ''
 
     try {
       await fetchEventSource(`${WEBUI_API_BASE_URL}/chat/say`, {
@@ -117,7 +76,7 @@ function BellaConversation() {
           authorization: `Bearer ${localStorage.token}`,
         },
         body: JSON.stringify(params),
-        onopen: async (res) => {
+        onopen: async res => {
           if (!res.ok) {
             const cloned = res.clone()
             const {errcode, msg} = await cloned.json()
@@ -126,55 +85,42 @@ function BellaConversation() {
             }
           }
         },
-        onmessage: async (event) => {
+        onmessage: async event => {
           const data = JSON.parse(event.data || '{}')
+          const answer = data.answer || ''
           // 流式内容传递给上层
           if (data.event === 'message') {
-            buffer += data.answer || ''
-            setCurrentMessage({
-              content: buffer,
-              role: 'assistant',
+            setCurrentMessage(c => {
+              const nextContent =
+                c.role === 'user' ? answer : c.content + answer
+              return {role: 'assistant', content: nextContent, is_end: false}
             })
             setShowMessage(true)
           }
           // 流式对话结束，设置延迟隐藏
           if (data.event === 'message_end') {
-            console.log('流式对话结束，设置延迟隐藏')
-            const timer = setTimeout(() => {
-              hideMessage()
-            }, 8000) // 8秒后隐藏
-            setHideTimeout(timer)
+            console.info('流式对话结束，设置延迟隐藏')
+            setCurrentMessage(c => ({...c, is_end: true}))
           }
           if (data.event === 'error') {
             Message.error(data.msg || 'Internal Server Error')
             setIsTyping(false)
-            setAction('idle')
             setShowMessage(false)
-            setCurrentMessage({
-              content: '',
-              role: 'assistant',
-            })
+            setCurrentMessage(c => ({...c, is_end: true}))
           }
         },
-        onerror: (err) => {
+        onerror: err => {
           console.error('EventSource error:', err)
           Message.error('Connection error')
           setIsTyping(false)
-          setAction('idle')
           setShowMessage(false)
-          setCurrentMessage({
-            content: '',
-            role: 'assistant',
-          })
+          setCurrentMessage(c => ({...c, is_end: true}))
         },
         onclose: () => {
-          console.log('流式连接关闭')
+          console.info('流式连接关闭')
           setIsTyping(false)
-          // 连接关闭时也设置延迟隐藏
-          const timer = setTimeout(() => {
-            hideMessage()
-          }, 8000) // 8秒后隐藏
-          setHideTimeout(timer)
+
+          setCurrentMessage(c => ({...c, is_end: true}))
         },
         openWhenHidden: true,
       })
@@ -182,12 +128,8 @@ function BellaConversation() {
       console.error('Failed to send message:', err)
       Message.error('Failed to send message')
       setIsTyping(false)
-      setAction('idle')
       setShowMessage(false)
-      setCurrentMessage({
-        content: '',
-        role: 'assistant',
-      })
+      setCurrentMessage(c => ({...c, is_end: true}))
     }
   }
 
@@ -199,39 +141,31 @@ function BellaConversation() {
     }
   }
 
-  // 清理定时器
-  useEffect(() => {
-    return () => {
-      if (hideTimeout) {
-        clearTimeout(hideTimeout)
-      }
-    }
-  }, [hideTimeout])
-
+  const renderMessageContent = useMemo(() => {
+    return currentMessage.content
+      .replace(/<display>.*?<\/display>/gis, '')
+      .split('\n')
+      .map((sentence, idx) => (
+        // eslint-disable-next-line react/no-array-index-key
+        <p key={`sentence-${idx}`} id={`bella-tts-${idx}`}>
+          {sentence}
+        </p>
+      ))
+  }, [currentMessage.content])
 
   return (
     <div className="flex flex-col h-full">
       {/* 消息显示区域 */}
       <div className="flex-1 flex flex-col justify-end p-6">
         {showMessage && currentMessage.content && (
-          <div 
+          <div
             className="mb-4 text-center transition-opacity duration-300"
-            id="bella-message-container"
-          >
+            id="bella-message-container">
             <div className="inline-block bg-white/20 backdrop-blur-md rounded-2xl px-6 py-4 max-w-2xl">
               <div
                 className="text-white text-lg font-medium max-h-[200px] overflow-y-auto"
-                id="bella-tts-text-container"
-              >
-                {currentMessage.content
-                  .replace(/<display>.*?<\/display>/gis, '')
-                  .split('\n')
-                  .map((sentence, idx) => (
-                    // eslint-disable-next-line react/no-array-index-key
-                    <p key={`sentence-${idx}`} id={`bella-tts-${idx}`}>
-                      {sentence.trim()}
-                    </p>
-                  ))}
+                id="bella-tts-text-container">
+                {renderMessageContent}
               </div>
             </div>
           </div>
@@ -247,7 +181,7 @@ function BellaConversation() {
             <div className="flex-1 relative">
               <textarea
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
+                onChange={e => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder={t('Type your message...')}
                 disabled={isTyping}
@@ -260,8 +194,7 @@ function BellaConversation() {
               <button
                 onClick={handleSendMessage}
                 disabled={!inputValue.trim() || isTyping}
-                className="bg-white/20 backdrop-blur-md rounded-2xl px-6 py-3 text-white font-medium hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all block"
-              >
+                className="bg-white/20 backdrop-blur-md rounded-2xl px-6 py-3 text-white font-medium hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all block">
                 {isTyping ? t('Sending...') : t('Send')}
               </button>
             </div>

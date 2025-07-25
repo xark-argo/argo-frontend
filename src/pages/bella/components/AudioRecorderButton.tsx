@@ -62,8 +62,7 @@ function AudioRecorderButton({onResult}: AudioRecorderButtonProps) {
       type="button"
       onClick={recording ? handleStop : handleStart}
       className={`mr-2 px-4 py-2 rounded ${recording ? 'bg-red-500' : 'bg-blue-500'} text-white`}
-      disabled={!isSupported}
-    >
+      disabled={!isSupported}>
       {recording ? '停止录音' : '语音输入'}
     </button>
   )
