@@ -26,6 +26,32 @@ function useTTS() {
   // 音频队列管理
   const audioQueueRef = useRef<AudioItem[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(new Audio())
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  // 重置TTS状态
+  const reset = useCallback(() => {
+    console.info('重置TTS状态')
+
+    // 停止当前播放的音频
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = new Audio()
+    }
+
+    // 移除所有事件监听器
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+
+    sentencesRef.current = []
+    processSentencesIndexRef.current = 0
+
+    // 清理所有队列和状态
+    audioQueueRef.current = []
+
+    console.info('TTS状态重置完成')
+  }, [])
 
   // 改进的括号处理逻辑：移除括号内容，但保持文本连续性
   const processTextInChunks = (text: string): string[] => {
@@ -76,6 +102,67 @@ function useTTS() {
     [tts_type, tts_voice]
   )
 
+  const audioEnded = useCallback((audioItem: AudioItem, cb: () => void) => {
+    console.info(`音频播放结束: '${audioItem.sentence}'`, audioItem)
+    // 播放下一个
+    try {
+      const container = document.getElementById('bella-tts-text-container')
+      if (container) {
+        // 查询所有子节点，找到与当前播放完成句子匹配的节点
+        const childNodes = Array.from(container.childNodes)
+        let targetNodeIndex = -1
+
+        // 寻找包含当前播放完成句子的节点
+        for (let i = 0; i < childNodes.length; i += 1) {
+          const node = childNodes[i]
+          if (
+            node.textContent &&
+            node.textContent.includes(audioItem.originalSentence)
+          ) {
+            targetNodeIndex = i
+            break
+          }
+        }
+
+        // 如果找到了目标节点，隐藏该节点之前的所有兄弟节点
+        if (targetNodeIndex > 0) {
+          for (let i = 0; i < targetNodeIndex; i += 1) {
+            const nodeToHide = childNodes[i] as HTMLElement
+            if (nodeToHide && nodeToHide.style) {
+              nodeToHide.style.display = 'none'
+            }
+          }
+          console.info(`隐藏了 ${targetNodeIndex} 个已播放完成的文本节点`)
+        }
+
+        // 从目标节点中移除已播放的句子内容
+        if (targetNodeIndex >= 0) {
+          const targetNode = childNodes[targetNodeIndex]
+          if (targetNode && targetNode.textContent) {
+            const updatedText = targetNode.textContent
+              .replace(audioItem.originalSentence, '')
+              // eslint-disable-next-line no-useless-escape
+              .replace(/[。？！\.\!\?\n]/g, '')
+
+            // 如果目标节点的内容全部播放完了，也隐藏该节点
+            if (updatedText.trim() === '') {
+              const targetElement = targetNode as HTMLElement
+              if (targetElement && targetElement.style) {
+                targetElement.style.display = 'none'
+              }
+              console.info('目标节点内容已全部播放完成，隐藏该节点')
+            } else {
+              targetNode.textContent = updatedText
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('replace text error', error)
+    }
+    cb()
+  }, [])
+
   // 播放队列中的下一个音频
   const playNextAudio = useCallback(async () => {
     if (audioQueueRef.current.length === 0 && !is_end) {
@@ -102,55 +189,15 @@ function useTTS() {
     audioElement.src = audioData
     audioElement.volume = 1.0
 
+    // 创建新的 AbortController 用于管理事件监听器
+    abortControllerRef.current = new AbortController()
+    const {signal} = abortControllerRef.current
+
     // 设置播放结束回调
     audioElement.addEventListener(
       'ended',
-      () => {
-        console.info(`音频播放结束: '${audioItem.sentence}'`, audioItem)
-        // 播放下一个
-        const container = document.getElementById('bella-tts-text-container')
-        if (container) {
-          // 查询所有子节点，找到与当前播放完成句子匹配的节点
-          const childNodes = Array.from(container.childNodes)
-          let targetNodeIndex = -1
-
-          // 寻找包含当前播放完成句子的节点
-          for (let i = 0; i < childNodes.length; i += 1) {
-            const node = childNodes[i]
-            if (
-              node.textContent &&
-              node.textContent.includes(audioItem.originalSentence)
-            ) {
-              targetNodeIndex = i
-              break
-            }
-          }
-
-          // 如果找到了目标节点，删除该节点之前的所有兄弟节点
-          if (targetNodeIndex > 0) {
-            for (let i = 0; i < targetNodeIndex; i += 1) {
-              const nodeToRemove = childNodes[i]
-              if (nodeToRemove.parentNode) {
-                nodeToRemove.parentNode.removeChild(nodeToRemove)
-              }
-            }
-            console.info(`删除了 ${targetNodeIndex} 个已播放完成的文本节点`)
-          }
-
-          // 从目标节点中移除已播放的句子内容
-          if (targetNodeIndex >= 0) {
-            const targetNode = childNodes[targetNodeIndex]
-            if (targetNode && targetNode.textContent) {
-              targetNode.textContent = targetNode.textContent
-                .replace(audioItem.originalSentence, '')
-                // eslint-disable-next-line no-useless-escape
-                .replace(/[。？！\.\!\?\n]/g, '')
-            }
-          }
-        }
-        playNextAudio()
-      },
-      {once: true}
+      () => audioEnded(audioItem, playNextAudio),
+      {once: true, signal}
     )
 
     // 设置播放错误回调
@@ -167,15 +214,22 @@ function useTTS() {
         // 尝试播放下一个
         playNextAudio()
       },
-      {once: true}
+      {once: true, signal}
     )
 
     // 开始播放
     console.info('开始播放音频:', audioItem.sentence)
-    audioElement.addEventListener('loadeddata', () => audioElement.play(), {
-      once: true,
-    })
-  }, [is_end])
+    audioElement.addEventListener(
+      'loadeddata',
+      () => {
+        audioElement.play()
+      },
+      {
+        once: true,
+        signal,
+      }
+    )
+  }, [audioEnded, is_end])
 
   // 处理新的句子
   const processNewSentences = useCallback(
@@ -224,25 +278,10 @@ function useTTS() {
     [generateAudio, playNextAudio]
   )
 
-  // 重置TTS状态
-  const reset = useCallback(() => {
-    console.info('重置TTS状态')
-
-    // 停止当前播放的音频
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0
-      audioRef.current.src = ''
-    }
-
-    // 清理所有队列和状态
-    audioQueueRef.current = []
-
-    console.info('TTS状态重置完成')
-  }, [])
-
   // 监听流式文本变化
   useEffect(() => {
     if (role !== 'assistant' || !sentenceStream) {
+      reset()
       return
     }
     sentencesRef.current = processTextInChunks(sentenceStream)
@@ -258,16 +297,7 @@ function useTTS() {
     }
     const newSentences = sentencesRef.current.slice(startIndex, endIndex)
     processNewSentences(newSentences, startIndex)
-  }, [sentenceStream, role, processNewSentences, is_end])
-
-  // 监听用户输入（通过检测role变化）
-  useEffect(() => {
-    if (role === 'user') {
-      // 用户输入新消息，清理语音播放队列
-      console.info('检测到用户输入，清理语音播放队列')
-      reset()
-    }
-  }, [role, reset])
+  }, [sentenceStream, role, processNewSentences, is_end, reset])
 
   return {
     reset,

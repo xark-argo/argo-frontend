@@ -31,11 +31,11 @@ function BellaConversation() {
     if (!inputValue.trim() || isTyping) return
 
     // 重置消息容器样式，确保新消息能正常显示
-    const messageContainer = document.getElementById('bella-message-container')
-    if (messageContainer) {
-      messageContainer.classList.remove('fade-out', 'hidden')
-      messageContainer.style.opacity = '1'
-    }
+    // const messageContainer = document.getElementById('bella-message-container')
+    // if (messageContainer) {
+    //   messageContainer.classList.remove('fade-out', 'hidden')
+    //   messageContainer.style.opacity = '1'
+    // }
 
     // 立即显示用户输入
     const message = inputValue.trim()
@@ -146,8 +146,11 @@ function BellaConversation() {
       .replace(/<display>.*?<\/display>/gis, '')
       .split('\n')
       .map((sentence, idx) => (
-        // eslint-disable-next-line react/no-array-index-key
-        <p key={`sentence-${idx}`} id={`bella-tts-${idx}`}>
+        <p
+          // eslint-disable-next-line react/no-array-index-key
+          key={`sentence-${idx}`}
+          id={`bella-tts-${idx}`}
+          className="text-left">
           {sentence}
         </p>
       ))
