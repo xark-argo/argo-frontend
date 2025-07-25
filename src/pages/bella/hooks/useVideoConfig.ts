@@ -331,28 +331,33 @@ function useVideoConfig() {
 
     getBalleVideoConfig().then((res) => {
       const videos = []
-      const baseUrl = `${window.location.origin}/api/files/resources/characters/ani/`
+      // 选择角色（目前选择第0个，后续可扩展选择逻辑）
+      const selectedRole = res?.[0]
+      if (!selectedRole) {
+        console.warn('No role data found')
+        return
+      }
+      
+      const role = selectedRole.name ?? 'ani'
+      const baseUrl = `${window.location.origin}/api/files/resources/characters/${role}/`
       const idleUrls = []
       
       // 配置 TTS 参数
       const ttsConfig = {
-        tts_type: res?.[0]?.tts_type ?? 'edge_tts',
+        tts_type: selectedRole.tts_type ?? 'edge_tts',
         tts_params: {
-          voice: res?.[0]?.tts_params?.voice ?? 'zh-CN-XiaoyiNeural',
+          voice: selectedRole.tts_params?.voice ?? 'zh-CN-XiaoyiNeural',
         },
       }
 
       setTtsConfig(ttsConfig)
       
-      // 收集所有 idle 视频
-      res
-        .map((item) => item.emotion_idle)
-        .filter(Boolean)
-        .forEach((idles) => {
-          idles.forEach((idle) => {
-            idleUrls.push(`${baseUrl}${idle}`)
-          })
+      // 只收集选中角色的 idle 视频
+      if (selectedRole.emotion_idle) {
+        selectedRole.emotion_idle.forEach((idle) => {
+          idleUrls.push(`${baseUrl}${idle}`)
         })
+      }
       
       // 添加 idle 视频配置
       videos.push({
@@ -360,15 +365,15 @@ function useVideoConfig() {
         url: idleUrls,
       })
 
-      // 添加其他情感视频配置
-      res.forEach((item) => {
-        Object.keys(item.emotionMap).forEach((emotion) => {
+      // 只添加选中角色的其他情感视频配置
+      if (selectedRole.emotionMap) {
+        Object.keys(selectedRole.emotionMap).forEach((emotion) => {
           videos.push({
-            actions: item.emotionMap[emotion].join(','),
+            actions: selectedRole.emotionMap[emotion].join(','),
             url: [`${baseUrl}${emotion}`],
           })
         })
-      })
+      }
       
       // 预加载所有视频
       videos.forEach((video) => {
