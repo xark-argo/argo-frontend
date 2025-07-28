@@ -1,9 +1,21 @@
 import {useAtomValue, useSetAtom} from 'jotai'
-import {useCallback, useEffect, useRef} from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 
 import {getBalleVideoConfig} from '~/lib/apis/bots'
 
 import {bellaTtsConfig, currentBellaMessage} from '../atoms'
+
+interface VideoConfig {
+  name: string
+  description: string
+  tts_type: string
+  tts_params: {voice: string}
+  emotionMap: {
+    [key: string]: string[]
+  }
+
+  emotion_idle: string[]
+}
 
 function useVideoConfig() {
   const {content: streamContent, role} = useAtomValue(currentBellaMessage)
@@ -12,11 +24,22 @@ function useVideoConfig() {
   const videoConfig = useRef<{actions: string; url: string[]}[]>([])
   // const streamActionConfigs = useRef(new Set<string>())
   const nextAction = useRef<string[]>([])
+  const [characters, setCharacters] = useState<VideoConfig[]>([])
+  const charactersRef = useRef<VideoConfig[]>([])
+  const videoCacheElements = useRef<HTMLVideoElement[]>([])
+  const [currentCharacter, setCurrentCharacter] = useState<string>('ani')
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const setTtsConfig = useSetAtom(bellaTtsConfig)
 
   const onPlayVideo = useCallback((currentAction: string, urls: string[]) => {
     const videoDom = videoRef.current
+    // 移除所有事件监听器
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    abortControllerRef.current = new AbortController()
     if (!videoDom || !urls.length) {
       console.info('videoDom is null or urls is empty')
       return
@@ -29,7 +52,7 @@ function useVideoConfig() {
       () => {
         videoDom.play()
       },
-      {once: true}
+      {once: true, signal: abortControllerRef.current?.signal}
     )
 
     videoDom.addEventListener(
@@ -60,38 +83,44 @@ function useVideoConfig() {
           }
         }, 300)
       },
-      {once: true}
+      {once: true, signal: abortControllerRef.current?.signal}
     )
   }, [])
 
-  useEffect(() => {
-    const videoCacheElements: HTMLVideoElement[] = []
-    getBalleVideoConfig().then(res => {
-      const videos = []
-      // 选择角色（目前选择第0个，后续可扩展选择逻辑）
-      const selectedRole = res?.[0]
-      if (!selectedRole) {
-        console.warn('No role data found')
+  const changeCharacter = useCallback(
+    (character: string) => {
+      const characterConfig = charactersRef.current.find(
+        item => item.name === character
+      )
+      console.info('changeCharacter', character, characterConfig)
+      if (!characterConfig) {
         return
       }
+      setCurrentCharacter(character)
+      videoCacheElements.current.forEach(video => {
+        video.remove()
+      })
+      videoCacheElements.current = []
 
-      const roleName = selectedRole.name ?? 'ani'
+      const videos = []
+
+      const roleName = characterConfig.name ?? 'ani'
       const baseUrl = `${window.location.origin}/api/files/resources/characters/${roleName}/`
       const idleUrls = []
 
       // 配置 TTS 参数
       const ttsConfig = {
-        tts_type: selectedRole.tts_type ?? 'edge_tts',
+        tts_type: characterConfig.tts_type ?? 'edge_tts',
         tts_params: {
-          voice: selectedRole.tts_params?.voice ?? 'zh-CN-XiaoyiNeural',
+          voice: characterConfig.tts_params?.voice ?? 'zh-CN-XiaoyiNeural',
         },
       }
 
       setTtsConfig(ttsConfig)
 
       // 只收集选中角色的 idle 视频
-      if (selectedRole.emotion_idle) {
-        selectedRole.emotion_idle.forEach(idle => {
+      if (characterConfig.emotion_idle) {
+        characterConfig.emotion_idle.forEach(idle => {
           idleUrls.push(`${baseUrl}${idle}`)
         })
       }
@@ -103,10 +132,10 @@ function useVideoConfig() {
       })
 
       // 只添加选中角色的其他情感视频配置
-      if (selectedRole.emotionMap) {
-        Object.keys(selectedRole.emotionMap).forEach(emotion => {
+      if (characterConfig.emotionMap) {
+        Object.keys(characterConfig.emotionMap).forEach(emotion => {
           videos.push({
-            actions: selectedRole.emotionMap[emotion].join(','),
+            actions: characterConfig.emotionMap[emotion].join(','),
             url: [`${baseUrl}${emotion}`],
           })
         })
@@ -120,20 +149,36 @@ function useVideoConfig() {
           videoEl.src = url
           videoEl.style.display = 'none' // 隐藏预加载的视频元素
           document.body.appendChild(videoEl)
-          videoCacheElements.push(videoEl)
+          videoCacheElements.current.push(videoEl)
         })
       })
 
       videoConfig.current = videos
 
       onPlayVideo('idle', idleUrls)
+    },
+    [onPlayVideo, setTtsConfig]
+  )
+
+  useEffect(() => {
+    getBalleVideoConfig().then(res => {
+      // 选择角色（目前选择第0个，后续可扩展选择逻辑）
+      const selectedRole = res?.[0]
+      if (!selectedRole) {
+        console.warn('No role data found')
+        return
+      }
+      setCharacters(res)
+      charactersRef.current = res
+
+      changeCharacter(selectedRole.name ?? 'ani')
     })
     return () => {
-      videoCacheElements.forEach(video => {
+      videoCacheElements.current.forEach(video => {
         video.remove()
       })
     }
-  }, [onPlayVideo, setTtsConfig])
+  }, [changeCharacter])
 
   useEffect(() => {
     if (role === 'user' && videoConfig.current.length > 0) {
@@ -181,6 +226,9 @@ function useVideoConfig() {
 
   return {
     videoRef,
+    character: currentCharacter,
+    characters: characters.map(item => item.name),
+    changeCharacter,
   }
 }
 
