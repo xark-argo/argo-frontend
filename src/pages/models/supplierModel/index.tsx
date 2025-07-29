@@ -465,8 +465,7 @@ function SupplierModel({getModelProvider, setEditing, deleteProvider}) {
               {[
                 ...$selectModelProvider.credentials.support_chat_models,
                 ...$selectModelProvider.credentials.support_embedding_models,
-              ]
-                .map((item, index) => modelItem(item, index))}
+              ].map((item, index) => modelItem(item, index))}
             </div>
           ) : null}
         </div>

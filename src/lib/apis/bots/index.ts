@@ -149,3 +149,11 @@ export const getTTS = async () => {
 export const getTTSVoice = async (params) => {
   return apiFetch('/tts/tts', params)
 }
+
+export const getBalleVideoConfig = async () => {
+  return apiFetch(
+    '/files/resources/characters/video_config.json',
+    {},
+    {method: 'GET'}
+  )
+}
