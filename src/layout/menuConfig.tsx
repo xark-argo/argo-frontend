@@ -49,6 +49,11 @@ export const menus = ({spaceId}) => {
       icon: ToolImg,
       name: 'Tools',
     },
+    {
+      path: `/space/${spaceId}/bot-conversation`,
+      icon: BotsImg,
+      name: '对话实验室',
+    },
   ]
 }
 

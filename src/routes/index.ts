@@ -31,6 +31,12 @@ const routes = () => {
       component: loadable(() => import('../pages/MCPtools')),
     },
     {
+      path: '/space/:spaceId/bot-conversation',
+      exact: true,
+      name: 'Bot Conversation',
+      component: loadable(() => import('../pages/botConversation')),
+    },
+    {
       path: '/space/:spaceId/bot/:botId',
       exact: true,
       name: '',
