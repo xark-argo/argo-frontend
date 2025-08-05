@@ -184,7 +184,25 @@ function BotConversation() {
     }
   }
 
+  // 🔧 连接状态监控
+  const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastMessageTimeRef = useRef<number>(Date.now())
 
+  // 🔧 清理连接超时监控
+  const clearConnectionTimeout = () => {
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current)
+      connectionTimeoutRef.current = null
+    }
+  }
+
+  // 🔧 设置连接超时监控（60秒无消息则认为连接异常）
+  const setConnectionTimeout = () => {
+    clearConnectionTimeout()
+    connectionTimeoutRef.current = setTimeout(() => {
+      console.warn('⚠️ 连接心跳超时，60秒未收到消息')
+    }, 60000)
+  }
 
   // 重定向到正确的workspace
   useEffect(() => {
@@ -309,94 +327,156 @@ function BotConversation() {
           authorization: `Bearer ${localStorage.token}`,
         },
         body: JSON.stringify(params),
+        // 🔧 关键：确保页面隐藏时连接不中断
+        openWhenHidden: true,
         onopen: async (res) => {
-          console.log('EventSource连接状态:', {status: res.status, ok: res.ok})
+          console.log('🔗 EventSource连接已建立:', {
+            status: res.status, 
+            ok: res.ok,
+            botId,
+            botName: getSelectedBotName(botId),
+            timestamp: new Date().toISOString()
+          })
+          
+          // 🔧 开始连接监控
+          lastMessageTimeRef.current = Date.now()
+          setConnectionTimeout()
+          
           if (!res.ok) {
             try {
               const cloned = res.clone()
               const errorText = await cloned.text()
-              console.error('API错误响应原文:', errorText)
+              console.error('❌ API错误响应原文:', errorText)
               
               let errorData
               try {
                 errorData = JSON.parse(errorText)
-                console.error('API错误响应JSON:', errorData)
+                console.error('❌ API错误响应JSON:', errorData)
               } catch (parseError) {
                 errorData = { message: errorText }
               }
               
-              reject(new Error(errorData.msg || errorData.message || errorText || `HTTP ${res.status}`))
+              throw new Error(errorData.msg || errorData.message || errorText || `HTTP ${res.status}`)
             } catch (parseError) {
-              console.error('解析错误响应失败:', parseError)
-              reject(new Error(`HTTP ${res.status} - ${res.statusText}`))
+              console.error('❌ 解析错误响应失败:', parseError)
+              throw new Error(`HTTP ${res.status} - ${res.statusText}`)
             }
           }
         },
         onmessage: (event) => {
-          const data = JSON.parse(event.data || '{}')
-          
-          // 🔧 关键：只在第一次获取会话ID时保存
-          if (data.conversation_id) {
-            if (isBot1 && !conversationId1Ref.current) {
-              console.log('✅ 首次获取Bot1会话ID:', {
-                botId,
-                botName: getSelectedBotName(botId),
-                conversationId: data.conversation_id,
-                isFirstTime: true
-              })
-              setConversationId1State(data.conversation_id)
-            } else if (isBot2 && !conversationId2Ref.current) {
-              console.log('✅ 首次获取Bot2会话ID:', {
-                botId,
-                botName: getSelectedBotName(botId), 
-                conversationId: data.conversation_id,
-                isFirstTime: true
-              })
-              setConversationId2State(data.conversation_id)
-            }
-          }
-          
-          if (data.event === 'message') {
-            buffer += data.answer || ''
-            // 实时更新最后一条消息
-            setConversationHistory(prev => {
-              const newHistory = [...prev]
-              const lastMessage = newHistory[newHistory.length - 1]
-              if (lastMessage && lastMessage.botId === botId) {
-                lastMessage.content = buffer
-              }
-              return newHistory
-            })
-          }
-          
-          if (data.event === 'message_end') {
-            console.log('✅ Bot消息完成:', {
-              bot: getSelectedBotName(botId),
-              responseLength: buffer.length
-            })
+          try {
+            // 🔧 更新心跳时间
+            lastMessageTimeRef.current = Date.now()
+            setConnectionTimeout() // 重置超时监控
             
-            // 将bot的回复添加到对应的历史中
-            if (isBot1) {
-              setBot1History(prev => [...prev, {role: 'assistant', content: buffer}])
-            } else {
-              setBot2History(prev => [...prev, {role: 'assistant', content: buffer}])
+            const data = JSON.parse(event.data || '{}')
+            
+            // 🔧 关键：只在第一次获取会话ID时保存
+            if (data.conversation_id) {
+              if (isBot1 && !conversationId1Ref.current) {
+                console.log('✅ 首次获取Bot1会话ID:', {
+                  botId,
+                  botName: getSelectedBotName(botId),
+                  conversationId: data.conversation_id,
+                  isFirstTime: true
+                })
+                setConversationId1State(data.conversation_id)
+              } else if (isBot2 && !conversationId2Ref.current) {
+                console.log('✅ 首次获取Bot2会话ID:', {
+                  botId,
+                  botName: getSelectedBotName(botId), 
+                  conversationId: data.conversation_id,
+                  isFirstTime: true
+                })
+                setConversationId2State(data.conversation_id)
+              }
             }
+            
+            if (data.event === 'message') {
+              buffer += data.answer || ''
+              // 实时更新最后一条消息
+              setConversationHistory(prev => {
+                const newHistory = [...prev]
+                const lastMessage = newHistory[newHistory.length - 1]
+                if (lastMessage && lastMessage.botId === botId) {
+                  lastMessage.content = buffer
+                }
+                return newHistory
+              })
+            }
+            
+            if (data.event === 'message_end') {
+              console.log('✅ Bot消息完成:', {
+                bot: getSelectedBotName(botId),
+                responseLength: buffer.length,
+                timestamp: new Date().toISOString()
+              })
+              
+              // 将bot的回复添加到对应的历史中
+              if (isBot1) {
+                setBot1History(prev => [...prev, {role: 'assistant', content: buffer}])
+              } else {
+                setBot2History(prev => [...prev, {role: 'assistant', content: buffer}])
+              }
 
-            // 🔧 简单返回消息内容，不在这里处理对话继续逻辑
-            resolve(buffer)
-          }
-          
-          if (data.event === 'error') {
-            console.error('Bot响应错误:', data)
-            reject(new Error(data.msg || data.message || 'Internal Server Error'))
+              // 🔧 简单返回消息内容，不在这里处理对话继续逻辑
+              resolve(buffer)
+            }
+            
+            if (data.event === 'error') {
+              console.error('❌ Bot响应错误:', data)
+              reject(new Error(data.msg || data.message || 'Internal Server Error'))
+            }
+          } catch (parseError) {
+            console.error('❌ 解析EventSource消息失败:', parseError, 'Raw data:', event.data)
+            // 不要因为单个消息解析失败就终止整个流
           }
         },
         onerror: (err) => {
-          console.error('EventSource error:', err)
-          reject(new Error('Connection error'))
+          // 🔧 清理连接监控
+          clearConnectionTimeout()
+          
+          console.error('💥 EventSource连接错误:', {
+            error: err,
+            botId,
+            botName: getSelectedBotName(botId),
+            errorType: err.name || 'Unknown',
+            errorMessage: err.message || 'Connection error',
+            timestamp: new Date().toISOString(),
+            connectionState: abortControllerRef.current?.signal.aborted ? 'Aborted' : 'Active'
+          })
+          
+          // 🔧 详细的错误分类和处理
+          if (err.name === 'AbortError') {
+            console.log('⏹️ 连接被主动终止')
+            reject(new Error('Connection was aborted'))
+          } else if (err.message?.includes('timeout')) {
+            console.error('⏰ 连接超时')
+            reject(new Error('Connection timeout'))
+          } else if (err.message?.includes('network')) {
+            console.error('🌐 网络错误')
+            reject(new Error('Network error'))
+          } else {
+            console.error('❓ 未知连接错误')
+            reject(new Error('Connection error: ' + (err.message || 'Unknown error')))
+          }
         },
         onclose: () => {
-          console.log('EventSource connection closed')
+          // 🔧 清理连接监控
+          clearConnectionTimeout()
+          
+          console.log('🔌 EventSource连接已关闭:', {
+            botId,
+            botName: getSelectedBotName(botId),
+            timestamp: new Date().toISOString(),
+            wasAborted: abortControllerRef.current?.signal.aborted,
+            bufferLength: buffer.length
+          })
+          
+          // 🔧 如果不是主动终止且没有收到完整响应，视为异常关闭
+          if (!abortControllerRef.current?.signal.aborted && buffer.length === 0) {
+            console.warn('⚠️ 连接异常关闭，没有收到任何数据')
+          }
         }
       })
     })
@@ -721,6 +801,18 @@ function BotConversation() {
   const getSelectedBotName = (botId: string) => {
     return botList.find(b => b.id === botId)?.name || botId
   }
+
+  // 🔧 组件清理
+  useEffect(() => {
+    return () => {
+      // 清理连接监控
+      clearConnectionTimeout()
+      // 终止未完成的连接
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [])
 
   return (
     <div className="h-full flex flex-col p-6 bg-gray-50" style={{ minHeight: '100vh' }}>
