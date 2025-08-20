@@ -191,16 +191,27 @@ function ResponseMessage({
 
   useEffect(() => {
     if (message.agent_thoughts) {
-      const plan = [...message.agent_thoughts]
-        .reverse()
-        .find((item) => item?.metadata?.langgraph_node?.includes('planner'))
+      const plan = [...message.agent_thoughts].reverse().find((item) => {
+        if (!item?.metadata?.langgraph_node?.includes('planner')) return false
+        try {
+          JSON.parse(item.thought)
+          return true
+        } catch {
+          return false
+        }
+      })
+
       const reporter = message.agent_thoughts.find((item) =>
         item?.metadata?.langgraph_node?.includes('reporter')
       )
       const researcher = message.agent_thoughts.find((item) =>
         item?.metadata?.langgraph_node?.includes('researcher')
       )
-      setIsPlan(plan)
+
+      if (plan) {
+        setIsPlan(plan)
+      }
+
       if (loading) {
         setPlanMsg(message)
         if (reporter || researcher) {
