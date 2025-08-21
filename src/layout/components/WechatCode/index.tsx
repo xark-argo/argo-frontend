@@ -1,6 +1,7 @@
 import {useEffect} from 'react'
 
-import srcImg from './wechat.jpg'
+const srcImg =
+  'https://gitee.com/xark-argo/argo/releases/download/v0.0.1/argo_wechat.jpg'
 
 function WechatCode({showQrcode, setShowQrcode, style = {bottom: '4px'}}: any) {
   const showQrcodeClick = (e) => {
