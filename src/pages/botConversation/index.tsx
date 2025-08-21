@@ -14,6 +14,7 @@ const {Title, Text} = Typography
 const {Option} = Select
 const {TextArea} = Input
 
+
 interface Bot {
   id: string
   name: string
@@ -27,6 +28,506 @@ interface ConversationMessage {
   botId: string
   botName: string
   timestamp: number
+}
+
+// CompareBot组件
+function CompareBot({spaceId, botList}: {spaceId: string, botList: Bot[]}) {
+  const [selectedBot1, setSelectedBot1] = useState<string>('')
+  const [selectedBot2, setSelectedBot2] = useState<string>('')
+  const [bot1Detail, setBot1Detail] = useState<any>(null)
+  const [bot2Detail, setBot2Detail] = useState<any>(null)
+  const [userInput, setUserInput] = useState<string>('')
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [conversationId1, setConversationId1] = useState<string>('')
+  const [conversationId2, setConversationId2] = useState<string>('')
+  const [configPanelCollapsed, setConfigPanelCollapsed] = useState<boolean>(false)
+  
+  // 分别为两个Bot维护对话历史
+  const [bot1History, setBot1History] = useState<ConversationMessage[]>([])
+  const [bot2History, setBot2History] = useState<ConversationMessage[]>([])
+
+  // 获取Bot详细信息
+  const loadBotDetail = async (botId: string): Promise<any> => {
+    try {
+      const detail = await getBotConfig(botId)
+      return detail
+    } catch (error) {
+      console.error('Failed to load bot detail:', error)
+      throw error
+    }
+  }
+
+  // 发送消息到指定bot
+  const sendMessageToBot = async (
+    botId: string,
+    message: string,
+    conversationId: string,
+    botDetail: any,
+    isBot1: boolean
+  ): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      let buffer = ''
+      const controller = new AbortController()
+
+      const params: any = {
+        invoke_from: 'web-app',
+        message,
+        inputs: botDetail.inputs || {},
+        bot_id: botId,
+        space_id: spaceId,
+        conversation_id: conversationId || '',
+        stream: true,
+        files: [],
+        model_config: botDetail.model_config || {},
+      }
+
+      // 先添加空的回复消息到对应Bot的历史中
+      const replyMsg: ConversationMessage = {
+        role: 'assistant',
+        content: '',
+        botId: botId,
+        botName: botList.find(b => b.id === botId)?.name || botId,
+        timestamp: Date.now() + (isBot1 ? 0 : 1) // 确保时间戳不同
+      }
+      
+      if (isBot1) {
+        setBot1History(prev => [...prev, replyMsg])
+      } else {
+        setBot2History(prev => [...prev, replyMsg])
+      }
+
+      fetchEventSource(`${WEBUI_API_BASE_URL}/chat/say`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          Accept: 'text/event-stream',
+          'Content-Type': 'text/event-stream',
+          authorization: `Bearer ${localStorage.token}`,
+        },
+        body: JSON.stringify(params),
+        openWhenHidden: true,
+        onopen: async (res) => {
+          if (!res.ok) {
+            try {
+              const cloned = res.clone()
+              const errorText = await cloned.text()
+              let errorData
+              try {
+                errorData = JSON.parse(errorText)
+              } catch (parseError) {
+                errorData = { message: errorText }
+              }
+              throw new Error(errorData.msg || errorData.message || errorText || `HTTP ${res.status}`)
+            } catch (parseError) {
+              throw new Error(`HTTP ${res.status} - ${res.statusText}`)
+            }
+          }
+        },
+        onmessage: (event) => {
+          try {
+            const data = JSON.parse(event.data || '{}')
+            
+            if (data.conversation_id) {
+              if (isBot1 && !conversationId1) {
+                setConversationId1(data.conversation_id)
+              } else if (!isBot1 && !conversationId2) {
+                setConversationId2(data.conversation_id)
+              }
+            }
+            
+            if (data.event === 'message') {
+              buffer += data.answer || ''
+              // 更新对应Bot的历史
+              if (isBot1) {
+                setBot1History(prev => {
+                  const newHistory = [...prev]
+                  const lastMessage = newHistory[newHistory.length - 1]
+                  if (lastMessage && lastMessage.botId === botId) {
+                    lastMessage.content = buffer
+                  }
+                  return newHistory
+                })
+              } else {
+                setBot2History(prev => {
+                  const newHistory = [...prev]
+                  const lastMessage = newHistory[newHistory.length - 1]
+                  if (lastMessage && lastMessage.botId === botId) {
+                    lastMessage.content = buffer
+                  }
+                  return newHistory
+                })
+              }
+            }
+            
+            if (data.event === 'message_end') {
+              resolve(buffer)
+            }
+            
+            if (data.event === 'error') {
+              reject(new Error(data.msg || data.message || 'Internal Server Error'))
+            }
+          } catch (parseError) {
+            console.error('解析EventSource消息失败:', parseError)
+          }
+        },
+        onerror: (err) => {
+          reject(new Error('Connection error: ' + (err.message || 'Unknown error')))
+        },
+        onclose: () => {
+          if (buffer.length === 0) {
+            reject(new Error('Connection closed without data'))
+          }
+        }
+      })
+    })
+  }
+
+  // 发送消息给两个bot
+  const sendMessage = async () => {
+    if (!selectedBot1 || !selectedBot2 || !userInput.trim()) {
+      Message.error('请选择两个Bot并输入消息')
+      return
+    }
+
+    if (selectedBot1 === selectedBot2) {
+      Message.error('请选择两个不同的Bot')
+      return
+    }
+
+    try {
+      setIsLoading(true)
+
+      // 添加用户消息到两个Bot的历史中
+      const userMsg: ConversationMessage = {
+        role: 'user',
+        content: userInput,
+        botId: 'user',
+        botName: '用户',
+        timestamp: Date.now()
+      }
+      
+      setBot1History(prev => [...prev, userMsg])
+      setBot2History(prev => [...prev, userMsg])
+
+      // 加载Bot详细信息
+      const [detail1, detail2] = await Promise.all([
+        loadBotDetail(selectedBot1),
+        loadBotDetail(selectedBot2)
+      ])
+      
+      setBot1Detail(detail1)
+      setBot2Detail(detail2)
+
+      // 同时发送给两个bot
+      const [response1, response2] = await Promise.all([
+        sendMessageToBot(selectedBot1, userInput, conversationId1, detail1, true),
+        sendMessageToBot(selectedBot2, userInput, conversationId2, detail2, false)
+      ])
+
+      setUserInput('')
+      setIsLoading(false)
+    } catch (error) {
+      console.error('发送消息失败:', error)
+      Message.error(`发送消息失败: ${error.message}`)
+      setIsLoading(false)
+    }
+  }
+
+  // 重置对话
+  const resetConversation = () => {
+    setBot1History([])
+    setBot2History([])
+    setConversationId1('')
+    setConversationId2('')
+    setUserInput('')
+  }
+
+  // 获取Bot名称
+  const getBotName = (botId: string) => {
+    return botList.find(b => b.id === botId)?.name || botId
+  }
+
+  return (
+    <div className="h-full flex flex-col min-h-0">
+      {/* 配置面板 - 可伸缩 */}
+      <Card 
+        className="mb-4 flex-shrink-0" 
+        title={
+          <div className="flex items-center justify-between">
+            <span>对话配置</span>
+            <Button
+              size="small"
+              onClick={() => setConfigPanelCollapsed(!configPanelCollapsed)}
+            >
+              {configPanelCollapsed ? '展开' : '收起'}
+            </Button>
+          </div>
+        }
+        style={{ 
+          maxHeight: configPanelCollapsed ? '60px' : 'none',
+          overflow: configPanelCollapsed ? 'hidden' : 'visible',
+          transition: 'all 0.3s ease'
+        }}
+        bodyStyle={{
+          padding: configPanelCollapsed ? '0 10px' : '10px'
+        }}
+      >
+        {!configPanelCollapsed && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-3">
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Text className="text-sm whitespace-nowrap">Bot 1:</Text>
+                    <Select
+                      placeholder="选择Bot 1"
+                      style={{width: '100%'}}
+                      value={selectedBot1}
+                      onChange={setSelectedBot1}
+                      size="small"
+                    >
+                      {botList.map(bot => (
+                        <Option key={bot.id} value={bot.id}>
+                          {bot.name}
+                        </Option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Text className="text-sm whitespace-nowrap">Bot 2:</Text>
+                    <Select
+                      placeholder="选择Bot 2"
+                      style={{width: '100%'}}
+                      value={selectedBot2}
+                      onChange={setSelectedBot2}
+                      size="small"
+                    >
+                      {botList.map(bot => (
+                        <Option key={bot.id} value={bot.id} disabled={bot.id === selectedBot1}>
+                          {bot.name}
+                        </Option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Text className="text-sm whitespace-nowrap">状态:</Text>
+                  <div className="flex items-center gap-2">
+                    {isLoading ? (
+                      <Tag color="green" size="small">发送中</Tag>
+                    ) : (
+                      <Tag color="gray" size="small">待发送</Tag>
+                    )}
+                    {selectedBot1 && (
+                      <Tag color="blue" size="small">
+                        {getBotName(selectedBot1)}
+                      </Tag>
+                    )}
+                    {selectedBot2 && (
+                      <Tag color="orange" size="small">
+                        {getBotName(selectedBot2)}
+                      </Tag>
+                    )}
+                    <span className="text-sm text-gray-500">消息: {bot1History.length + bot2History.length}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Text className="text-sm whitespace-nowrap">操作:</Text>
+                  <div className="flex gap-2">
+                    <Button
+                      type="primary"
+                      onClick={sendMessage}
+                      loading={isLoading}
+                      disabled={!selectedBot1 || !selectedBot2 || !userInput.trim()}
+                      size="small"
+                    >
+                      发送
+                    </Button>
+                    <Button
+                      icon={<IconRefresh />}
+                      onClick={resetConversation}
+                      size="small"
+                    >
+                      重置
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-3">
+              <div className="flex items-center gap-2 mb-1">
+                <Text className="text-sm whitespace-nowrap">消息内容:</Text>
+                <TextArea
+                  placeholder="请输入消息内容..."
+                  value={userInput}
+                  onChange={setUserInput}
+                  rows={2}
+                  maxLength={500}
+                  showWordLimit
+                  style={{ fontSize: '14px', flex: 1 }}
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </Card>
+
+      {/* 对话历史对比区域 - 可滚动 */}
+      <Card 
+        title="对话历史对比" 
+        className="flex-1 min-h-0"
+        style={{ 
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+        bodyStyle={{ 
+          flex: 1,
+          display: 'flex', 
+          flexDirection: 'column',
+          padding: 0,
+          overflow: 'hidden',
+          minHeight: 0
+        }}
+      >
+        <div className="flex-1 min-h-0 flex flex-col" style={{ overflow: 'hidden' }}>
+          {/* 标题栏 */}
+          <div className="flex border-b bg-gray-50 flex-shrink-0">
+            <div className="flex-1 p-3 text-center font-medium text-blue-600 border-r">
+              {selectedBot1 ? getBotName(selectedBot1) : 'Bot 1'}
+            </div>
+            <div className="flex-1 p-3 text-center font-medium text-orange-600">
+              {selectedBot2 ? getBotName(selectedBot2) : 'Bot 2'}
+            </div>
+          </div>
+          
+          {/* 对话内容区域 - 可滚动 */}
+          <div className="flex-1 flex min-h-0" style={{ overflow: 'hidden' }}>
+            {/* 左侧Bot1对话历史 */}
+            <div 
+              className="flex-1 overflow-y-auto overflow-x-hidden p-4 border-r min-h-0"
+              style={{ 
+                minHeight: '400px',
+                maxHeight: '100%',
+                scrollBehavior: 'smooth'
+              }}
+            >
+              {bot1History.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  暂无对话内容
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {bot1History.map((msg, index) => (
+                    <div key={index} className="flex flex-col w-full">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Tag 
+                          color={msg.botId === 'user' ? 'green' : 'blue'}
+                        >
+                          {msg.botName}
+                        </Tag>
+                        <Text type="secondary" className="text-xs">
+                          {new Date(msg.timestamp).toLocaleTimeString()}
+                        </Text>
+                      </div>
+                      <div 
+                        className={`p-3 rounded-lg w-full ${
+                          msg.botId === 'user' ? 'bg-green-50 border-l-4 border-green-400' :
+                          'bg-blue-50 border-l-4 border-blue-400'
+                        }`}
+                        style={{ maxWidth: '100%', wordBreak: 'break-word' }}
+                      >
+                        <Text className="whitespace-pre-wrap break-words">{msg.content}</Text>
+                      </div>
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="text-center py-4">
+                      <Text type="secondary">正在生成回复...</Text>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 右侧Bot2对话历史 */}
+            <div 
+              className="flex-1 overflow-y-auto overflow-x-hidden p-4 min-h-0"
+              style={{ 
+                minHeight: '400px',
+                maxHeight: '100%',
+                scrollBehavior: 'smooth'
+              }}
+            >
+              {bot2History.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  暂无对话内容
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {bot2History.map((msg, index) => (
+                    <div key={index} className="flex flex-col w-full">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Tag 
+                          color={msg.botId === 'user' ? 'green' : 'orange'}
+                        >
+                          {msg.botName}
+                        </Tag>
+                        <Text type="secondary" className="text-xs">
+                          {new Date(msg.timestamp).toLocaleTimeString()}
+                        </Text>
+                      </div>
+                      <div 
+                        className={`p-3 rounded-lg w-full ${
+                          msg.botId === 'user' ? 'bg-green-50 border-l-4 border-green-400' :
+                          'bg-orange-50 border-l-4 border-orange-400'
+                        }`}
+                        style={{ maxWidth: '100%', wordBreak: 'break-word' }}
+                      >
+                        <Text className="whitespace-pre-wrap break-words">{msg.content}</Text>
+                      </div>
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="text-center py-4">
+                      <Text type="secondary">正在生成回复...</Text>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 底部统计信息 */}
+          {(bot1History.length > 0 || bot2History.length > 0) && (
+            <div className="border-t p-3 bg-gray-100 flex-shrink-0">
+              <div className="flex justify-between items-center text-sm">
+                <Text type="secondary">
+                  Bot1: {bot1History.length} 条消息 | Bot2: {bot2History.length} 条消息
+                </Text>
+                <Text type="secondary">
+                  {(conversationId1 || conversationId2) && (
+                    <span className="text-xs text-gray-400">
+                      会话: {conversationId1 ? conversationId1.slice(-8) : '待创建'} | {conversationId2 ? conversationId2.slice(-8) : '待创建'}
+                    </span>
+                  )}
+                </Text>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+    </div>
+  )
 }
 
 function BotConversation() {
@@ -47,6 +548,10 @@ function BotConversation() {
   const [currentRound, setCurrentRound] = useState<number>(0)
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [currentSpeaker, setCurrentSpeaker] = useState<1 | 2>(1)
+  const [configPanelCollapsed, setConfigPanelCollapsed] = useState<boolean>(false)
+  
+  // 当前激活的tab
+  const [activeTab, setActiveTab] = useState<'bot2bot' | 'compareBot'>('bot2bot')
 
   // 对话历史存储 - 为每个bot维护独立的历史
   const [bot1History, setBot1History] = useState<Array<{role: string, content: string}>>([])
@@ -815,215 +1320,294 @@ function BotConversation() {
   }, [])
 
   return (
-    <div className="h-full flex flex-col p-6 bg-gray-50" style={{ minHeight: '100vh' }}>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Bot对话实验室</h2>
-        <Text type="secondary">让两个Bot进行自主对话，观察它们的交流过程</Text>
+    <div className="h-full flex flex-col bg-gray-50" style={{ height: '100vh', overflow: 'hidden' }}>
+      {/* 固定头部区域 */}
+      <div className="flex-shrink-0 p-6 pb-4 bg-gray-50 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-2xl font-bold text-gray-900">对话实验室</h2>
+          
+          {/* Tab切换与标题融合在一行 */}
+          <div className="flex border-b border-gray-200">
+            <button
+              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                activeTab === 'bot2bot' 
+                  ? 'border-blue-500 text-blue-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+              onClick={() => setActiveTab('bot2bot')}
+            >
+              Bot2Bot对话
+            </button>
+            <button
+              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                activeTab === 'compareBot' 
+                  ? 'border-blue-500 text-blue-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+              onClick={() => setActiveTab('compareBot')}
+            >
+              CompareBot对比
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* 配置区域 */}
-      <Card className="mb-6 flex-shrink-0" title="对话配置">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-          <div>
-            <Text>选择第一个Bot:</Text>
-            <Select
-              placeholder="请选择Bot 1"
-              style={{width: '100%'}}
-              value={selectedBot1}
-              onChange={setSelectedBot1}
-              disabled={isConversationActive}
-            >
-              {botList.map(bot => (
-                <Option key={bot.id} value={bot.id}>
-                  {bot.name}
-                </Option>
-              ))}
-            </Select>
-          </div>
-
-          <div>
-            <Text>选择第二个Bot:</Text>
-            <Select
-              placeholder="请选择Bot 2"
-              style={{width: '100%'}}
-              value={selectedBot2}
-              onChange={setSelectedBot2}
-              disabled={isConversationActive}
-            >
-              {botList.map(bot => (
-                <Option key={bot.id} value={bot.id} disabled={bot.id === selectedBot1}>
-                  {bot.name}
-                </Option>
-              ))}
-            </Select>
-          </div>
-
-          <div>
-            <Text>对话轮数: {currentRound} / {maxRounds}</Text>
-            <div className="mt-2">
-              {isConversationActive ? (
-                <Tag color="green">对话进行中</Tag>
-              ) : (
-                <Tag color="gray">对话未开始</Tag>
-              )}
-              {currentSpeaker === 1 && isConversationActive && (
-                <Tag color="blue" className="ml-2">
-                  {getSelectedBotName(selectedBot1)} 发言中
-                </Tag>
-              )}
-              {currentSpeaker === 2 && isConversationActive && (
-                <Tag color="orange" className="ml-2">
-                  {getSelectedBotName(selectedBot2)} 发言中
-                </Tag>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-4">
-          <Text>开场对话 (作为第一个Bot的首条消息):</Text>
-          <TextArea
-            placeholder="请输入开场对话内容..."
-            value={openingMessage}
-            onChange={setOpeningMessage}
-            disabled={isConversationActive}
-            rows={3}
-            maxLength={500}
-            showWordLimit
-          />
-        </div>
-
-        <Space>
-          <Button
-            type="primary"
-            icon={<IconPlayArrowFill />}
-            onClick={startConversation}
-            loading={isLoading}
-            disabled={isConversationActive || !selectedBot1 || !selectedBot2 || !openingMessage.trim()}
-          >
-            开始对话
-          </Button>
-
-          <Button
-            icon={<IconRecordStop />}
-            onClick={stopConversation}
-            disabled={!isConversationActive}
-          >
-            停止对话
-          </Button>
-
-          <Button
-            icon={<IconRefresh />}
-            onClick={resetConversation}
-          >
-            重置
-          </Button>
-        </Space>
-      </Card>
-
-      {/* 对话历史区域 */}
-      <Card 
-        title="对话历史" 
-        className="flex-1"
-        style={{ 
-          minHeight: '500px',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-        bodyStyle={{ 
-          flex: 1,
-          display: 'flex', 
-          flexDirection: 'column',
-          padding: 0,
-          overflow: 'hidden',
-          minHeight: 0
-        }}
-      >
-        <div className="flex-1 min-h-0 flex flex-col">
-          <div 
-            ref={conversationContainerRef}
-            className="flex-1 overflow-y-auto overflow-x-hidden p-4 bg-white"
-            style={{ 
-              minHeight: '400px',
-              maxHeight: '100%',
-              scrollBehavior: 'smooth'
-            }}
-          >
-            {conversationHistory.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                暂无对话内容，请配置Bot并开始对话
-              </div>
-            ) : (
-              <div className="space-y-4 w-full">
-                {conversationHistory.map((msg, index) => (
-                  <div key={index} className="flex flex-col w-full">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Tag color={msg.botId === selectedBot1 ? 'blue' : 'orange'}>
-                        {msg.botName}
-                      </Tag>
-                      <Text type="secondary" className="text-xs">
-                        {new Date(msg.timestamp).toLocaleTimeString()}
-                      </Text>
-                    </div>
-                    <div 
-                      className={`p-3 rounded-lg w-full ${
-                        msg.botId === selectedBot1 
-                          ? 'bg-blue-50 border-l-4 border-blue-400' 
-                          : 'bg-orange-50 border-l-4 border-orange-400'
-                      }`}
-                      style={{ maxWidth: '100%', wordBreak: 'break-word' }}
-                    >
-                      <Text className="whitespace-pre-wrap break-words">{msg.content}</Text>
-                    </div>
-                  </div>
-                ))}
-                {isLoading && (
-                  <div className="text-center py-4">
-                    <Text type="secondary">正在生成回复...</Text>
-                  </div>
-                )}
-                {/* 用于自动滚动到底部的标记元素 */}
-                <div ref={conversationEndRef} style={{ height: '1px' }} />
-              </div>
-            )}
-          </div>
-
-          {conversationHistory.length > 0 && (
-            <div className="border-t p-3 bg-gray-100 flex-shrink-0">
-              <div className="flex justify-between items-center flex-wrap gap-2">
-                <Text type="secondary" className="flex-shrink-0">
-                  对话统计: 总计 {conversationHistory.length} 条消息，已进行 {currentRound} 轮对话
-                  {(conversationId1 || conversationId2) && (
-                    <span className="ml-2 text-xs text-gray-400 block sm:inline">
-                      (会话: {getSelectedBotName(selectedBot1)}→{conversationId1 ? conversationId1.slice(-8) : '待创建'} | {getSelectedBotName(selectedBot2)}→{conversationId2 ? conversationId2.slice(-8) : '待创建'})
-                    </span>
-                  )}
-                </Text>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {!shouldAutoScroll && (
-                    <Button 
-                      size="small" 
-                      type="primary" 
-                      onClick={forceScrollToBottom}
-                    >
-                      回到底部
-                    </Button>
-                  )}
+      {/* 可滚动的内容区域 */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {activeTab === 'bot2bot' && (
+          <div className="h-full flex flex-col min-h-0">
+            {/* 配置区域 - 更紧凑 */}
+            <Card 
+              className="mb-4 flex-shrink-0" 
+              title={
+                <div className="flex items-center justify-between">
+                  <span>对话配置</span>
                   <Button
                     size="small"
-                    icon={<IconRecordStop />}
-                    onClick={stopConversation}
-                    disabled={!isConversationActive}
-                    status="warning"
+                    onClick={() => setConfigPanelCollapsed(!configPanelCollapsed)}
                   >
-                    停止对话
+                    {configPanelCollapsed ? '展开' : '收起'}
                   </Button>
                 </div>
+              }
+              style={{ 
+                maxHeight: configPanelCollapsed ? '60px' : 'none',
+                overflow: configPanelCollapsed ? 'hidden' : 'visible',
+                transition: 'all 0.3s ease'
+              }}
+              bodyStyle={{
+                padding: configPanelCollapsed ? '0 10px' : '10px'
+              }}
+            >
+              {!configPanelCollapsed && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Text className="text-sm whitespace-nowrap">Bot 1:</Text>
+                          <Select
+                            placeholder="选择Bot 1"
+                            style={{width: '100%'}}
+                            value={selectedBot1}
+                            onChange={setSelectedBot1}
+                            disabled={isConversationActive}
+                            size="small"
+                          >
+                            {botList.map(bot => (
+                              <Option key={bot.id} value={bot.id}>
+                                {bot.name}
+                              </Option>
+                            ))}
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Text className="text-sm whitespace-nowrap">Bot 2:</Text>
+                          <Select
+                            placeholder="选择Bot 2"
+                            style={{width: '100%'}}
+                            value={selectedBot2}
+                            onChange={setSelectedBot2}
+                            disabled={isConversationActive}
+                            size="small"
+                          >
+                            {botList.map(bot => (
+                              <Option key={bot.id} value={bot.id} disabled={bot.id === selectedBot1}>
+                                {bot.name}
+                              </Option>
+                            ))}
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Text className="text-sm whitespace-nowrap">状态:</Text>
+                        <div className="flex items-center gap-2">
+                          {isConversationActive ? (
+                            <Tag color="green" size="small">进行中</Tag>
+                          ) : (
+                            <Tag color="gray" size="small">未开始</Tag>
+                          )}
+                          {currentSpeaker === 1 && isConversationActive && (
+                            <Tag color="blue" size="small">
+                              {getSelectedBotName(selectedBot1)}
+                            </Tag>
+                          )}
+                          {currentSpeaker === 2 && isConversationActive && (
+                            <Tag color="orange" size="small">
+                              {getSelectedBotName(selectedBot2)}
+                            </Tag>
+                          )}
+                          <span className="text-sm text-gray-500">轮数: {currentRound}/{maxRounds}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Text className="text-sm whitespace-nowrap">操作:</Text>
+                        <div className="flex gap-2">
+                          <Button
+                            type="primary"
+                            icon={<IconPlayArrowFill />}
+                            onClick={startConversation}
+                            loading={isLoading}
+                            disabled={isConversationActive || !selectedBot1 || !selectedBot2 || !openingMessage.trim()}
+                            size="small"
+                          >
+                            开始
+                          </Button>
+                          <Button
+                            icon={<IconRecordStop />}
+                            onClick={stopConversation}
+                            disabled={!isConversationActive}
+                            size="small"
+                          >
+                            停止
+                          </Button>
+                          <Button
+                            icon={<IconRefresh />}
+                            onClick={resetConversation}
+                            size="small"
+                          >
+                            重置
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Text className="text-sm whitespace-nowrap">开场对话:</Text>
+                      <TextArea
+                        placeholder="请输入开场对话内容..."
+                        value={openingMessage}
+                        onChange={setOpeningMessage}
+                        disabled={isConversationActive}
+                        rows={2}
+                        maxLength={500}
+                        showWordLimit
+                        style={{ fontSize: '14px', flex: 1 }}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </Card>
+
+            {/* 对话历史区域 - 占据更多空间 */}
+            <Card 
+              title="对话历史" 
+              className="flex-1 min-h-0"
+              style={{ 
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0
+              }}
+              bodyStyle={{ 
+                flex: 1,
+                display: 'flex', 
+                flexDirection: 'column',
+                padding: 0,
+                overflow: 'hidden',
+                minHeight: 0
+              }}
+            >
+              <div className="flex-1 min-h-0 flex flex-col">
+                <div 
+                  ref={conversationContainerRef}
+                  className="flex-1 overflow-y-auto overflow-x-hidden p-4 bg-white"
+                  style={{ 
+                    scrollBehavior: 'smooth'
+                  }}
+                >
+                  {conversationHistory.length === 0 ? (
+                    <div className="text-center text-gray-500 py-8">
+                      暂无对话内容，请配置Bot并开始对话
+                    </div>
+                  ) : (
+                    <div className="space-y-4 w-full">
+                      {conversationHistory.map((msg, index) => (
+                        <div key={index} className="flex flex-col w-full">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Tag color={msg.botId === selectedBot1 ? 'blue' : 'orange'}>
+                              {msg.botName}
+                            </Tag>
+                            <Text type="secondary" className="text-xs">
+                              {new Date(msg.timestamp).toLocaleTimeString()}
+                            </Text>
+                          </div>
+                          <div 
+                            className={`p-3 rounded-lg w-full ${
+                              msg.botId === selectedBot1 
+                                ? 'bg-blue-50 border-l-4 border-blue-400' 
+                                : 'bg-orange-50 border-l-4 border-orange-400'
+                            }`}
+                            style={{ maxWidth: '100%', wordBreak: 'break-word' }}
+                          >
+                            <Text className="whitespace-pre-wrap break-words">{msg.content}</Text>
+                          </div>
+                        </div>
+                      ))}
+                      {isLoading && (
+                        <div className="text-center py-4">
+                          <Text type="secondary">正在生成回复...</Text>
+                        </div>
+                      )}
+                      {/* 用于自动滚动到底部的标记元素 */}
+                      <div ref={conversationEndRef} style={{ height: '1px' }} />
+                    </div>
+                  )}
+                </div>
+
+                {conversationHistory.length > 0 && (
+                  <div className="border-t p-2 bg-gray-50 flex-shrink-0">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <Text type="secondary" className="text-sm flex-shrink-0">
+                        总计 {conversationHistory.length} 条消息，{currentRound} 轮对话
+                        {(conversationId1 || conversationId2) && (
+                          <span className="ml-2 text-xs text-gray-400 block sm:inline">
+                            ({getSelectedBotName(selectedBot1)}:{conversationId1 ? conversationId1.slice(-6) : '待创建'} | {getSelectedBotName(selectedBot2)}:{conversationId2 ? conversationId2.slice(-6) : '待创建'})
+                          </span>
+                        )}
+                      </Text>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {!shouldAutoScroll && (
+                          <Button 
+                            size="mini" 
+                            type="primary" 
+                            onClick={forceScrollToBottom}
+                          >
+                            回到底部
+                          </Button>
+                        )}
+                        <Button
+                          size="mini"
+                          icon={<IconRecordStop />}
+                          onClick={stopConversation}
+                          disabled={!isConversationActive}
+                          status="warning"
+                        >
+                          停止
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
-        </div>
-      </Card>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === 'compareBot' && (
+          <CompareBot spaceId={spaceId} botList={botList} />
+        )}
+      </div>
     </div>
   )
 }

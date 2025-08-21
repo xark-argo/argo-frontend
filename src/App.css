@@ -183,3 +183,45 @@ input[type='number'] {
 .arco-radio-checked > .arco-radio-mask-wrapper > .arco-radio-mask::after{
 	transform: scale(0.6);
 }
+
+/* 自定义Tabs滚动条样式 */
+.custom-tabs-scroll .arco-tabs-content {
+	overflow: visible !important;
+}
+
+/* 确保配置区域固定不滚动 */
+.custom-tabs-scroll .arco-card {
+	overflow: visible !important;
+}
+
+.custom-tabs-scroll .arco-card-body {
+	overflow: auto !important;
+}
+
+/* 对话历史区域可滚动 */
+.custom-tabs-scroll .arco-card[title*="对话历史"] {
+	overflow: hidden !important;
+}
+
+.custom-tabs-scroll .arco-card[title*="对话历史"] .arco-card-body {
+	overflow: hidden !important;
+}
+
+/* 配置区域固定样式 */
+.custom-tabs-scroll .arco-card[title*="对话配置"] {
+	overflow: visible !important;
+}
+
+.custom-tabs-scroll .arco-card[title*="对话配置"] .arco-card-body {
+	overflow: auto !important;
+}
+
+/* 关键修复：确保对话历史容器可以滚动 */
+.custom-tabs-scroll .arco-card[title*="对话历史"] .arco-card-body > div {
+	overflow: auto !important;
+}
+
+/* 为CompareBot的左右对话历史容器添加滚动支持 */
+.custom-tabs-scroll .arco-card[title*="对话历史对比"] .arco-card-body > div > div:last-child > div > div {
+	overflow: auto !important;
+}
