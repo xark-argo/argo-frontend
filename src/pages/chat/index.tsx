@@ -316,7 +316,7 @@ function Chat() {
 
   return (
     <div
-      className={`bg-white flex flex-col h-full min-w-100 overflow-hidden relative bg-[url(${$botDetail?.background_img})]`}
+      className="bg-white flex flex-col h-full min-w-100 overflow-hidden relative"
       style={{
         background: `url(${$botDetail?.background_img}) no-repeat center / 100% 100%`,
       }}
