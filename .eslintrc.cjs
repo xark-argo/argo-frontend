@@ -126,5 +126,11 @@ module.exports = {
     'react/static-property-placement': 'off',
     'react/react-in-jsx-scope': 'off',
     'react/jsx-uses-react': 'off',
+    'no-console': [
+      'error',
+      {
+        allow: ['info', 'warn', 'error'],
+      },
+    ],
   },
 }

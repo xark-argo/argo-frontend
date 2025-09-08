@@ -40,3 +40,7 @@ export const userSignUp = async (
 
   return res
 }
+
+export const userGuestLogin = async (code: string) => {
+  return apiFetch(`/auth/guest-login`, {code})
+}

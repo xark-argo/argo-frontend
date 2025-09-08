@@ -49,6 +49,10 @@ function App() {
           component={loadable(() => import('~/pages/auth'))}
         />
         <Route
+          path="/bella/:botId/:conversationId?"
+          component={loadable(() => import('~/pages/bella'))}
+        />
+        <Route
           render={() => {
             return <Layout />
           }}
