@@ -12,6 +12,8 @@ import {getKnowledgeDetailInfo} from '~/lib/apis/knowledge'
 import {uploadFiles} from '~/lib/apis/upload'
 
 import ToolSelector from './McpTool'
+import ClearIcon from '~/pages/assets/ClearIcon.svg'
+import EditIcon from '~/pages/assets/EditIcon'
 
 function MessageInput({
   handleSubmit,
@@ -28,6 +30,8 @@ function MessageInput({
   editPlanMode = null,
   onEditPlanModeChange = () => {},
   handleChangeDeepSearch,
+  onNewChat = () => {},
+  onClearChat = () => {},
 }: any) {
   const timer = useRef(null)
   const inputRef = useRef(null)
@@ -258,9 +262,9 @@ function MessageInput({
 
   return (
     <div className="z-50">
-      <div className="pb-[30px] inset-x-0 mx-auto">
+      <div className="pb-[15px] inset-x-0 mx-auto">
         <Form onSubmit={handleSubmitChat}>
-          <div className=" bg-[#F9F9F9] rounded-xl p-[14px]">
+          <div className=" bg-[#F9F9F9] rounded-xl px-[14px] py-[8px]">
             {/* Edit Plan Mode Indicator */}
             {editPlanMode && (
               <div className="mb-2 flex items-center gap-2 px-3 py-2 bg-blue-50/80 border border-blue-200/60 rounded-md">
@@ -343,38 +347,39 @@ function MessageInput({
                 ))}
               </div>
             ) : null}
-            <Input.TextArea
-              autoFocus
-              ref={inputRef}
-              value={sendMsg}
-              disabled={loading || disabled}
-              onChange={(e) => {
-                setSendMsg(e)
-              }}
-              placeholder={t('Type your message here...')}
-              onKeyDown={(e) => {
-                if (
-                  sendMsg !== '' &&
-                  e.key === 'Enter' &&
-                  !e.shiftKey &&
-                  !uploading.current
-                ) {
-                  e.preventDefault()
-                  handleSubmitChat()
-                }
-              }}
-              autoSize={{maxRows: 6, minRows: 2}}
-              className="no-scrollbar focus:border-[transparent] bg-[#F9F9F9] flex-shrink-0 outline-none flex-1 px-1 rounded-xl appearance-none resize-none"
-            />
-            <div className="flex items-center justify-between mt-3 h-8">
+            <div className="flex items-center gap-2 mb-2">
+              <Input.TextArea
+                autoFocus
+                ref={inputRef}
+                value={sendMsg}
+                disabled={loading || disabled}
+                onChange={(e) => {
+                  setSendMsg(e)
+                }}
+                placeholder={t('Type your message here...')}
+                onKeyDown={(e) => {
+                  if (
+                    sendMsg !== '' &&
+                    e.key === 'Enter' &&
+                    !e.shiftKey &&
+                    !uploading.current
+                  ) {
+                    e.preventDefault()
+                    handleSubmitChat()
+                  }
+                }}
+                autoSize={{maxRows: 4, minRows: 1}}
+                className="no-scrollbar focus:border-[transparent] bg-[#F9F9F9] flex-1 outline-none px-3 py-2 rounded-xl appearance-none resize-none"
+              />
+            </div>
+            <div className="flex items-center gap-2 h-6">
               {isShowModel && modelValue && modelValue.name ? (
                 <ModelSelect
                   modelList={modelList}
-                  className="w-[200px] bg-[#F2F2F2] rounded-[8px] border-[0.5px] border-[#AEAFB366]"
+                  className="w-[140px] bg-[#F2F2F2] rounded-[6px] border-[0.5px] border-[#AEAFB366]"
                   value={modelInfo?.id || modelValue}
                   placeholder="Select model"
                   onChange={(value) => {
-                    // const info = modelList.find((v) => v.model_name === value.m)
                     if (value) {
                       changeModel(value)
                     }
@@ -386,24 +391,38 @@ function MessageInput({
                     boxShadow: '0px 2px 10px 0px #00000026',
                   }}
                 />
-              ) : (
-                <div />
-              )}
-              {isShowModel ? (
-                <div className="flex items-center mr-auto">
-                  <ToolSelector
-                    tools={detail?.model_config?.agent_mode?.tools?.filter(
-                      (v) => v.type === 'mcp_tool'
-                    )}
-                    handleChangeDeepSearch={handleChangeDeepSearch}
-                    enabled={detail?.model_config?.agent_mode?.enabled}
-                    changeTools={changeTools}
-                    model={modelInfo || modelValue}
-                    className="mr-auto ml-[10px] flex"
-                  />
-                </div>
               ) : null}
-              <div className="flex items-center gap-[2px]">
+              {isShowModel ? (
+                <ToolSelector
+                  tools={detail?.model_config?.agent_mode?.tools?.filter(
+                    (v) => v.type === 'mcp_tool'
+                  )}
+                  handleChangeDeepSearch={handleChangeDeepSearch}
+                  enabled={detail?.model_config?.agent_mode?.enabled}
+                  changeTools={changeTools}
+                  model={modelInfo || modelValue}
+                  className="flex"
+                />
+              ) : null}
+              <div className="flex items-center gap-1">
+                <Tooltip content={t('New Chat')}>
+                  <button
+                    onClick={onNewChat}
+                    className="bg-[#f2f2f2] border-[0.5px] text-[#03060E] cursor-pointer w-[30px] h-[30px] border-[#AEAFB366] flex items-center justify-center rounded-[6px] hover:bg-[#e8e8e8] transition-colors"
+                  >
+                    <EditIcon />
+                  </button>
+                </Tooltip>
+                <Tooltip content={t('Clear')}>
+                  <button
+                    onClick={onClearChat}
+                    className="bg-[#f2f2f2] border-[0.5px] text-[#03060E] cursor-pointer w-[30px] h-[30px] border-[#AEAFB366] flex items-center justify-center rounded-[6px] hover:bg-[#e8e8e8] transition-colors"
+                  >
+                    <img src={ClearIcon} alt="" className="w-5 h-5" />
+                  </button>
+                </Tooltip>
+              </div>
+              <div className="flex items-center gap-1 ml-auto">
                 {showUpload ? (
                   <Tooltip
                     content={t(
@@ -458,7 +477,7 @@ function MessageInput({
                 <Tooltip content={t('Send message')}>
                   <button
                     aria-label="submit"
-                    className={`flex justify-center items-center transition rounded-lg w-8 h-8 self-center ${
+                    className={`flex justify-center items-center transition rounded-lg w-8 h-8 ${
                       sendMsg !== '' && !loading && !uploading.current
                         ? 'bg-black text-white hover:bg-gray-900 '
                         : 'text-white bg-gray-200 '

@@ -1,4 +1,4 @@
-import {Message, Modal, Spin} from '@arco-design/web-react'
+import {Message, Modal, Spin, Tooltip} from '@arco-design/web-react'
 import {fetchEventSource} from '@microsoft/fetch-event-source'
 import {useAtom} from 'jotai'
 import cloneDeep from 'lodash/cloneDeep'
@@ -278,12 +278,16 @@ function Conversation({
     const tools = $botDetail.model_config.agent_mode.tools.filter(
       (v) => v.type !== 'dataset'
     )
+    
+    // 只更新策略，不自动修改enabled状态
+    $botDetail.model_config.agent_mode.strategy = value
+    
+    // 只有在关闭深度研究且没有MCP工具时才禁用
     if (value !== 'react_deep_research' && !tools?.length) {
       $botDetail.model_config.agent_mode.enabled = false
-    } else {
-      $botDetail.model_config.agent_mode.enabled = true
     }
-    $botDetail.model_config.agent_mode.strategy = value
+    // 深度研究模式不自动启用，保持当前enabled状态
+    
     setBotDetail(cloneDeep($botDetail))
     if ($activeChat?.agent_mode?.strategy) {
       $activeChat.agent_mode.strategy = value
@@ -690,22 +694,6 @@ function Conversation({
           </>
         )}
       </div>
-      <div className="flex items-center gap-[14px] mb-[14px]">
-        <div
-          onClick={handleNewChat}
-          className="bg-white border-[0.5px] text-[#03060E] text-[14px] cursor-pointer h-[30px]  border-[#EBEBEB] py-1 px-4 flex items-center gap-[3px] rounded-[8px]"
-        >
-          <EditIcon />
-          {t('New Chat')}
-        </div>
-        <div
-          onClick={handleRestart}
-          className="bg-white border-[0.5px] text-[#03060E] text-[14px] cursor-pointer h-[30px]  border-[#EBEBEB] py-1 px-4 flex items-center gap-[3px] rounded-[8px]"
-        >
-          <img src={ClearIcon} alt="" />
-          {t('Clear')}
-        </div>
-      </div>
       <MessageInput
         disabled={!$activeChat.bot_id}
         handleSubmit={handleSubmit}
@@ -720,6 +708,8 @@ function Conversation({
         handleChangeDeepSearch={handleChangeDeepSearch}
         editPlanMode={editPlanMode}
         onEditPlanModeChange={setEditPlanMode}
+        onNewChat={handleNewChat}
+        onClearChat={handleRestart}
       />
     </div>
   )
