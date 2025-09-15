@@ -167,5 +167,8 @@ module.exports = {
       xl: `${pxToRem(1380)}rem`,
     },
   },
-  plugins: [require("@headlessui/tailwindcss"), require('@tailwindcss/typography')],
+  plugins: [
+    require("@headlessui/tailwindcss"), 
+    require('@tailwindcss/typography')
+  ],
 };

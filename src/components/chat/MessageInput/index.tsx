@@ -263,19 +263,19 @@ function MessageInput({
           <div className=" bg-[#F9F9F9] rounded-xl p-[14px]">
             {/* Edit Plan Mode Indicator */}
             {editPlanMode && (
-              <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                <span className="text-sm font-medium text-blue-700">
+              <div className="mb-2 flex items-center gap-2 px-3 py-2 bg-blue-50/80 border border-blue-200/60 rounded-md">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+                <span className="text-xs font-medium text-blue-700">
                   {t('Edit Plan Mode')}
                 </span>
                 <button
                   type="button"
                   onClick={() => onEditPlanModeChange(null)}
-                  className="ml-auto text-blue-500 hover:text-blue-700 transition-colors"
+                  className="ml-auto text-blue-500 hover:text-blue-700 transition-colors p-0.5 rounded"
                   aria-label="Exit edit plan mode"
                 >
                   <svg
-                    className="w-4 h-4"
+                    className="w-3.5 h-3.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"

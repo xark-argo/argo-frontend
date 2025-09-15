@@ -160,42 +160,36 @@ export default function StartPlan({
   }
 
   return (
-    <div className="w-1/2 h-full relative border-l-[0.5px] bg-white">
-      <div className="flex justify-between items-center px-6 h-16 border-b border-gray-100 bg-white relative">
-        <div className="flex space-x-8 h-full">
+    <div className="w-1/2 h-full relative bg-white shadow-lg">
+      <div className="flex justify-between items-center px-4 h-12 border-b border-gray-100 bg-white relative">
+        <div className="flex space-x-6 h-full">
           <button
-            className={`relative h-full flex items-center font-medium text-[16px] transition-colors ${
+            className={`relative h-full flex items-center font-medium text-sm transition-all duration-200 px-3 py-1 rounded-md ${
               planMode === 'activities'
-                ? 'text-[#133EBF]'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'text-[#133EBF] bg-blue-50'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
             }`}
             onClick={() => setPlanMode('activities')}
           >
             {t('Activities')}
-            {planMode === 'activities' && (
-              <span className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#133EBF] rounded-t-md" />
-            )}
           </button>
 
           <button
-            className={`relative h-full flex items-center font-medium text-[16px] transition-colors ${
+            className={`relative h-full flex items-center font-medium text-sm transition-all duration-200 px-3 py-1 rounded-md ${
               planMode === 'report'
-                ? 'text-[#133EBF]'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'text-[#133EBF] bg-blue-50'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
             }`}
             onClick={() => setPlanMode('report')}
           >
             {t('Report')}
-            {planMode === 'report' && (
-              <span className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#133EBF] rounded-t-md" />
-            )}
           </button>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2">
           {planMode === 'report' && (
             <>
-              <div
-                className="cursor-pointer ml-40"
+              <button
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700"
                 onClick={async () => {
                   if (
                     $planMsg.reporterAnswer &&
@@ -220,11 +214,11 @@ export default function StartPlan({
                 }}
               >
                 <Tooltip content={t('Copy')}>
-                  <IconCopy className="text-[18px] hover:text-[#1843bc]" />
+                  <IconCopy className="w-4 h-4" />
                 </Tooltip>
-              </div>
-              <div
-                className="cursor-pointer"
+              </button>
+              <button
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700"
                 onClick={async () => {
                   // 获取要下载的内容
                   let content = ''
@@ -270,9 +264,9 @@ export default function StartPlan({
                 }}
               >
                 <Tooltip content={t('Download')}>
-                  <IconDownload className="text-[18px] hover:text-[#1843bc]" />
+                  <IconDownload className="w-4 h-4" />
                 </Tooltip>
-              </div>
+              </button>
             </>
           )}
 
@@ -281,15 +275,15 @@ export default function StartPlan({
               setOpenPlan(false)
               setVisibleExtra(false)
             }}
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700"
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700"
             aria-label="Close"
           >
-            <IconClose className="w-5 h-5" />
+            <IconClose className="w-4 h-4" />
           </button>
         </div>
       </div>
       <div
-        className="text-16 leading-[26px] text-[#03060E] font-400 h-[80%] overflow-auto m-5"
+        className="text-sm leading-6 text-gray-800 font-normal h-[calc(100%-3rem)] overflow-auto px-4 py-3"
         onScroll={handleScroll}
         ref={containerRef}
       >

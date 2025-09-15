@@ -19,7 +19,7 @@ function UserMore({
   if (!visible) return null
 
   return (
-    <div className="hidden group-hover:flex hover:flex absolute p-[2px] items-center gap-[3px] bottom-0 right-5 bg-white rounded-[6px]">
+    <div className="hidden group-hover:flex hover:flex absolute p-[2px] items-center gap-[3px] bottom-0 left-[66px] bg-white rounded-[6px]">
       <div className="shrink-0 w-[26px] h-[26px] cursor-pointer">
         <Popconfirm
           title={t('Confirm your action')}

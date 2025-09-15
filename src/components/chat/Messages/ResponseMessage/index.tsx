@@ -167,23 +167,18 @@ function ResponseMessage({
     const report = message.agent_thoughts.find((item) =>
       item?.metadata?.langgraph_node?.includes('reporter')
     )
+    const hasReport = (researcher && researcher.length) || report
+    
     return (
-      <div className=" py-[10px] px-[20px] rounded-tl-[4px] rounded-tr-[23px] rounded-bl-[23px] rounded-br-[23px] bg-[#F2F2F2E5] rounded-lg">
-        <TaskItem message={isPlan?.thought} />
-        {(researcher && researcher.length) || report ? (
-          <div className="max-w-2xl mx-auto mt-4 flex items-center justify-between px-2 py-3 bg-gray-50 rounded-lg border border-gray-200">
-            {reportGeneration()}
-            <button
-              onClick={() => {
-                setPlanMsg(message)
-                setOpenPlan(true)
-              }}
-              className="text-blue-600 hover:text-blue-800 font-medium px-3 py-1 rounded-md hover:bg-blue-50 transition-colors duration-200"
-            >
-              {t('View report')}
-            </button>
-          </div>
-        ) : null}
+      <div className="w-full">
+        <TaskItem 
+          message={isPlan?.thought} 
+          showViewReport={hasReport}
+          onViewReport={() => {
+            setPlanMsg(message)
+            setOpenPlan(true)
+          }}
+        />
         {loading ? <span ref={cursorRef}>|</span> : null}
       </div>
     )
@@ -227,7 +222,7 @@ function ResponseMessage({
     }
     if (!isEdit) {
       return (
-        <div className="flex space-x-2 py-[10px] px-[20px] rounded-tl-[4px] rounded-tr-[23px] rounded-bl-[23px] rounded-br-[23px] bg-[#F2F2F2E5] font-600 rounded-lg">
+        <div className="flex space-x-2 py-[10px] px-[20px] rounded-[4px] bg-transparent border border-gray-200 shadow-sm font-600 rounded-lg">
           <div className=" w-full text-16 leading-[26px] text-[#03060E] font-400">
             {message.sending ? (
               <IconLoading />
@@ -285,11 +280,6 @@ function ResponseMessage({
         />
       </div>
       <div className="w-full overflow-hidden pl-1">
-        <div
-          className={`self-center line-clamp-1 contents text-[${nameColor}] text-14`}
-        >
-          {detail.name}
-        </div>
         <div className="prose w-full max-w-full">
           <div className="w-full">{renderMsg()}</div>
           {interruptEvent &&
