@@ -447,20 +447,23 @@ function Conversation({
               setOpenPlan(true)
             }
             setResponse((pre) => {
-              pre.answer += data.answer || ''
-              buffer += data.answer
-              const lastIndex = pre.agent_thoughts.length - 1
-              if (
-                pre.agent_thoughts[lastIndex] &&
-                pre.agent_thoughts[lastIndex].id
-              ) {
-                pre.agent_thoughts.push({
-                  thought: buffer,
-                })
-              } else if (lastIndex > -1) {
-                pre.agent_thoughts[lastIndex] = {
-                  ...pre.agent_thoughts[lastIndex],
-                  thought: buffer,
+              // 过滤planner的消息
+              if (!data.metadata?.langgraph_node?.includes('planner')) {
+                pre.answer += data.answer || ''
+                buffer += data.answer
+                const lastIndex = pre.agent_thoughts.length - 1
+                if (
+                  pre.agent_thoughts[lastIndex] &&
+                  pre.agent_thoughts[lastIndex].id
+                ) {
+                  pre.agent_thoughts.push({
+                    thought: buffer,
+                  })
+                } else if (lastIndex > -1) {
+                  pre.agent_thoughts[lastIndex] = {
+                    ...pre.agent_thoughts[lastIndex],
+                    thought: buffer,
+                  }
                 }
               }
 
@@ -509,7 +512,10 @@ function Conversation({
             response.agent_thoughts.push(cloneDeep(data))
           } else {
             response.agent_thoughts[lastIndex] = cloneDeep(data)
-            response.answer = data.thought
+            // 不要将planner的thought设置到answer中
+            if (!data.metadata?.langgraph_node?.includes('planner')) {
+              response.answer = data.thought
+            }
           }
           setResponse(cloneDeep(response))
 

@@ -228,20 +228,24 @@ function ResponseMessage({
               <IconLoading />
             ) : (
               <div id={message.id}>
-                {message.agent_thoughts?.map((v) => (
-                  <div key={v.id} id={v.id}>
-                    <MarkdownText
-                      message={v?.thought || ''}
-                      isSending={loading}
-                    />
-                    {v.tool_type ? (
-                      <ExtraMessage
-                        info={v}
-                        handleClick={() => handleClickExtraItem(v)}
+                {message.agent_thoughts?.map((v) =>
+                  v.metadata?.langgraph_node &&
+                  !v.metadata?.langgraph_node?.includes('planner') &&
+                  !v.metadata?.langgraph_node?.includes('reporter') ? (
+                    <div key={v.id} id={v.id}>
+                      <MarkdownText
+                        message={v?.thought || ''}
+                        isSending={loading}
                       />
-                    ) : null}
-                  </div>
-                ))}
+                      {v.tool_type ? (
+                        <ExtraMessage
+                          info={v}
+                          handleClick={() => handleClickExtraItem(v)}
+                        />
+                      ) : null}
+                    </div>
+                  ) : null
+                )}
                 {!message.agent_thoughts ||
                 message.agent_thoughts.length === 0 ? (
                   <MarkdownText

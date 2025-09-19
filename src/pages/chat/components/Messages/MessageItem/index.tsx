@@ -240,21 +240,23 @@ function MessageItem({
                 setOpenPlan(true)
               }
               setChat((pre) => {
-                pre.answer += data.answer || ''
-                // setChat({...chat})
-                buffer += data.answer
-                const lastIndex = pre.agent_thoughts.length - 1
-                if (
-                  pre.agent_thoughts[lastIndex] &&
-                  pre.agent_thoughts[lastIndex].id
-                ) {
-                  pre.agent_thoughts.push({
-                    thought: buffer,
-                  })
-                } else if (lastIndex > -1) {
-                  pre.agent_thoughts[lastIndex] = {
-                    ...pre.agent_thoughts[lastIndex],
-                    thought: buffer,
+                // 过滤planner的消息
+                if (!data.metadata?.langgraph_node?.includes('planner')) {
+                  pre.answer += data.answer || ''
+                  buffer += data.answer
+                  const lastIndex = pre.agent_thoughts.length - 1
+                  if (
+                    pre.agent_thoughts[lastIndex] &&
+                    pre.agent_thoughts[lastIndex].id
+                  ) {
+                    pre.agent_thoughts.push({
+                      thought: buffer,
+                    })
+                  } else if (lastIndex > -1) {
+                    pre.agent_thoughts[lastIndex] = {
+                      ...pre.agent_thoughts[lastIndex],
+                      thought: buffer,
+                    }
                   }
                 }
                 const regex = /[….?!。？！]/
