@@ -9,6 +9,7 @@ import {activeChat, currentWorkspace} from '~/lib/stores'
 
 import {MenuRoute} from '../../menuConfig'
 import ChatList from '../ChatList'
+import Settings from '~/components/settings'
 
 const BotLeft = memo(() => {
   const {pathname} = useLocation()
@@ -33,6 +34,8 @@ const BotLeft = memo(() => {
       window.removeEventListener('storage', storageChange)
     }
   })
+
+  const [settingsVisible, setSettingsVisible] = useState(false)
 
   return (
     <div
@@ -83,6 +86,35 @@ const BotLeft = memo(() => {
         ''
       )}
       <ChatList visibleMenu={visibleMenu} />
+
+      {/* 底部按钮区域：设置 / 联系我们 */}
+      <div className={`mt-2 ${visibleMenu ? 'w-full' : 'w-[42px] mx-auto'} flex-shrink-0`}>
+        <div className={`${visibleMenu ? 'space-y-2' : 'space-y-2'} pb-3`}>
+          <button
+            className={`${visibleMenu ? 'w-full justify-start px-[10px]' : 'w-[42px] justify-center px-0'} h-[36px] rounded-[8px] bg-[#EBEBEB] hover:bg-[#E1E1E1] text-[#03060E] text-[14px] font-500 flex items-center`}
+            onClick={() => setSettingsVisible(true)}
+          >
+            {/* 简单齿轮图标 */}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`${visibleMenu ? 'mr-[10px]' : ''} w-4 h-4`}>
+              <path fillRule="evenodd" d="M11.983 1.954a1 1 0 00-1.966 0l-.146.878a6.987 6.987 0 00-1.36.79l-.82-.472a1 1 0 00-1.366.366l-.982 1.7a1 1 0 00.366 1.366l.82.474a6.987 6.987 0 000 1.58l-.82.474a1 1 0 00-.366 1.366l.982 1.7a1 1 0 001.366.366l.82-.472c.43.32.88.586 1.36.79l.146.878a1 1 0 001.966 0l.146-.878c.48-.204.93-.47 1.36-.79l.82.472a1 1 0 001.366-.366l.982-1.7a1 1 0 00-.366-1.366l-.82-.474a6.987 6.987 0 000-1.58l.82-.474a1 1 0 00.366-1.366l-.982-1.7a1 1 0 00-1.366-.366l-.82.472a6.987 6.987 0 00-1.36-.79l-.146-.878zM10 12.25a2.25 2.25 0 110-4.5 2.25 2.25 0 010 4.5z" clipRule="evenodd" />
+            </svg>
+            {visibleMenu ? <span className="truncate">{t('Settings')}</span> : null}
+          </button>
+          <button
+            className={`${visibleMenu ? 'w-full justify-start px-[10px]' : 'w-[42px] justify-center px-0'} h-[36px] rounded-[8px] bg-[#EBEBEB] hover:bg-[#E1E1E1] text-[#03060E] text-[14px] font-500 flex items-center`}
+            onClick={() => setSettingsVisible(true)}
+          >
+            {/* 简单联系图标 */}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`${visibleMenu ? 'mr-[10px]' : ''} w-4 h-4`}>
+              <path d="M2.003 5.884A2 2 0 014 4h12a2 2 0 011.997 1.884L10 10.882 2.003 5.884z" />
+              <path d="M18 8.118 10.553 12.89a1 1 0 01-1.106 0L2 8.118V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+            </svg>
+            {visibleMenu ? <span className="truncate">{t('Contact us')}</span> : null}
+          </button>
+        </div>
+      </div>
+
+      <Settings visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
     </div>
   )
 })
