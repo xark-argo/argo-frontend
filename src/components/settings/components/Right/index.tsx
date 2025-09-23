@@ -4,7 +4,7 @@ import {useTranslation} from 'react-i18next'
 function SettingRight({activeTab, onClose}) {
   const {t} = useTranslation()
   return (
-    <div className="relative flex-1 h-[720px] pb-4 overflow-y-auto rounded-xl flex flex-col no-scrollbar">
+    <div className="relative flex-1 h-[800px] pb-4 overflow-y-auto rounded-xl flex flex-col no-scrollbar">
       <div className="sticky top-0 px-6 py-4 flex items-center h-15 border-b-[0.5px] border-b-[#EBEBEB] bg-white text-base font-600 text-gray-900 z-20">
         <div className="shrink-0">{t(activeTab.text)}</div>
         <div className="grow flex justify-end">

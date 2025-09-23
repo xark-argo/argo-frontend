@@ -10,7 +10,6 @@ import {autoLogin, isInArgo} from '~/utils'
 import {errorModal} from '~/utils/errorModal'
 
 import Content from './components/Content'
-import Sidebar from './components/Sidebar'
 import Updater from './Updater'
 
 function Layout() {
@@ -79,7 +78,6 @@ function Layout() {
   return (
     <div className="text-gray-700 bg-[#EDEFF2]/90 h-screen max-h-[100dvh] overflow-auto flex flex-row">
       <Updater />
-      <Sidebar />
       <Content currentSpaceId={$currentWorkspace.id} />
       <ErrorModal ref={modalRef} />
     </div>

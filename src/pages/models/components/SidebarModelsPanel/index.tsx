@@ -4,7 +4,6 @@ import {useAtom, useAtomValue} from 'jotai'
 import {useEffect, useState} from 'react'
 import {useParams} from 'react-router-dom'
 
-import SidebarClose from '~/components/icons/SidebarClose'
 import CreateCustomModel from '~/components/settings/components/ModelProvider/ModelCard/CreateCustomModel'
 import {updateModelProviders} from '~/lib/apis/settings'
 import {uploadFile} from '~/lib/apis/upload'
@@ -24,7 +23,6 @@ function SidebarModelsPanel({
   const [$modelList] = useAtom(modelList)
   const [$selectModelProvider, setSelectModelProvider] =
     useAtom(selectModelProvider)
-  const [showSlider, setShowSidebar] = useState(true)
   const [openCreatModal, setOpenCreatModal] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [clickProvider, setClickProvider] = useState(null)
@@ -135,29 +133,6 @@ function SidebarModelsPanel({
     }
   }
 
-  const modelListShort = (item) => {
-    return (
-      <Tooltip
-        content={item.credentials.custom_name || item.provider}
-        trigger="hover"
-        position="rt"
-      >
-        <div
-          className={`p-[10px] w-11 hover:bg-[#EBEBEB] mx-auto my-0 rounded-lg cursor-pointer ${isCurrentSelect(item) ? 'bg-[#EBEBEB]' : ''}`}
-          onClick={() => changeSelectProvider(item)}
-          key={item.provider}
-        >
-          <div className="rounded-md overflow-hidden flex justify-center">
-            <img
-              src={item.credentials?.icon_url}
-              alt=""
-              className="w-auto h-6"
-            />
-          </div>
-        </div>
-      </Tooltip>
-    )
-  }
 
   const modelItemLong = (item) => {
     return (
@@ -189,132 +164,65 @@ function SidebarModelsPanel({
     )
   }
 
-  useEffect(() => {
-    const visible = localStorage.botMenuVisible
-    if (visible !== undefined) {
-      setShowSidebar(Boolean(visible))
-    }
-  }, [])
-
   return (
     <>
-      <div
-        className={`bg-[#F9F9F9] flex flex-col h-[100vh] overflow-hidden ${showSlider ? 'w-[250px]' : 'w-[74px]'} transition-all duration-150`}
-      >
-        <div
-          onClick={() => {
-            localStorage.setItem('botMenuVisible', !showSlider ? '1' : '')
-            setShowSidebar((pre) => !pre)
-          }}
-          className={`cursor-pointer w-6 h-6 my-7 ${showSlider ? 'ml-7 ' : 'mx-auto'}`}
-        >
-          <SidebarClose />
-        </div>
-
-        <div>
-          {showSlider ? (
-            <div className="mx-4">
-              <div className="text-[#565759] leading-[40px] font-[600] ml-3">
-                {t('Local LLM Provider')}
-              </div>
-              <div
-                className={`p-[10px] rounded-lg hover:bg-[#EBEBEB] cursor-pointer ${$selectModelProvider.provider === 'ollama' ? 'bg-[#EBEBEB]' : ''}`}
-                onClick={() => {
-                  const select = structuredClone($selectModelProvider)
-                  select.provider = 'ollama'
-                  select.custom_name = ''
-                  select.credentials.custom_name = ''
-                  changeSelectProvider(select)
-                }}
-              >
-                <div className="flex justify-between">
-                  <div className="flex">
-                    <div className="rounded-md overflow-hidden">
-                      <ArgoImage />
-                    </div>
-                    <div className="text-[#03060E] font-[600] ml-1">
-                      ARGO-LLM
-                    </div>
-                  </div>
-                  {!LLMConnectError && (
-                    <div className="text-[#133EBF] bg-[#F2F6FF] border-[0.5px] border-[rgba(19, 62, 191, 0.7)] w-[38px] h-[18px] leading-[18px] text-center rounded-[40px] text-12">
-                      ON
-                    </div>
-                  )}
-                </div>
-                <div className="text-[#6F6F71] text-[10px] mt-1">
-                  {t('Download&Run Local Models Powered by Ollama')}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <Tooltip content="ARGO-LLM" trigger="hover" position="rt">
-              <div
-                className={`rounded-lg w-11 my-0 mx-auto hover:bg-[#EBEBEB] p-[10px] cursor-pointer ${$selectModelProvider.provider === 'ollama' ? 'bg-[#EBEBEB]' : ''}`}
-              >
-                <div
-                  className="rounded-md overflow-hidden "
-                  onClick={() => {
-                    const select = structuredClone($selectModelProvider)
-                    select.provider = 'ollama'
-                    select.custom_name = ''
-                    select.credentials.custom_name = ''
-                    changeSelectProvider(select)
-                  }}
-                >
+      <div className="bg-[#F9F9F9] flex flex-col h-[100vh] overflow-hidden w-[250px]">
+        <div className="mx-4">
+          <div className="text-[#565759] leading-[40px] font-[600] ml-3">
+            {t('Local LLM Provider')}
+          </div>
+          <div
+            className={`p-[10px] rounded-lg hover:bg-[#EBEBEB] cursor-pointer ${$selectModelProvider.provider === 'ollama' ? 'bg-[#EBEBEB]' : ''}`}
+            onClick={() => {
+              const select = structuredClone($selectModelProvider)
+              select.provider = 'ollama'
+              select.custom_name = ''
+              select.credentials.custom_name = ''
+              changeSelectProvider(select)
+            }}
+          >
+            <div className="flex justify-between">
+              <div className="flex">
+                <div className="rounded-md overflow-hidden">
                   <ArgoImage />
                 </div>
+                <div className="text-[#03060E] font-[600] ml-1">
+                  ARGO-LLM
+                </div>
               </div>
-            </Tooltip>
-          )}
+              {!LLMConnectError && (
+                <div className="text-[#133EBF] bg-[#F2F6FF] border-[0.5px] border-[rgba(19, 62, 191, 0.7)] w-[38px] h-[18px] leading-[18px] text-center rounded-[40px] text-12">
+                  ON
+                </div>
+              )}
+            </div>
+            <div className="text-[#6F6F71] text-[10px] mt-1">
+              {t('Download&Run Local Models Powered by Ollama')}
+            </div>
+          </div>
         </div>
 
         <div className="border-t-[0.5px] border-[#EBEBEB] my-[10px] mx-4" />
 
-        {showSlider ? (
-          <div className="mx-4">
-            <div>
-              <div className="text-[#565759] leading-[40px] font-[600] ml-3">
-                {t('LLM API Provider')}
-              </div>
-              <div
-                className="max-h-[calc(100vh-350px)] overflow-auto"
-                ref={sideListRef}
-              >
-                {$modelList.model_list.map(modelItemLong)}
-              </div>
+        <div className="mx-4">
+          <div>
+            <div className="text-[#565759] leading-[40px] font-[600] ml-3">
+              {t('LLM API Provider')}
             </div>
             <div
-              className="text-[#03060E] h-10 leading-10 rounded-md border border-[#03060E] cursor-pointer text-center mt-[10px]"
-              onClick={() => changeSelectProvider('add')}
-            >
-              {t('Add OpenAI-Compatible-API')}
-            </div>
-          </div>
-        ) : (
-          <>
-            <div
-              className="max-h-[calc(100vh-250px)] overflow-y-auto overflow-x-hidden"
+              className="max-h-[calc(100vh-350px)] overflow-auto"
               ref={sideListRef}
             >
-              {$modelList.model_list.map(modelListShort)}
+              {$modelList.model_list.map(modelItemLong)}
             </div>
-            <Tooltip
-              content={t('Add OpenAI-Compatible-API')}
-              trigger="hover"
-              position="rt"
-            >
-              <div className="rounded-lg cursor-pointer">
-                <div
-                  className="w-6 rounded-md overflow-hidden p-[7px] border border-[#03060E] h-6 flex items-center my-[10px] mx-auto"
-                  onClick={() => changeSelectProvider('add')}
-                >
-                  <AddImage />
-                </div>
-              </div>
-            </Tooltip>
-          </>
-        )}
+          </div>
+          <div
+            className="text-[#03060E] h-10 leading-10 rounded-md border border-[#03060E] cursor-pointer text-center mt-[10px]"
+            onClick={() => changeSelectProvider('add')}
+          >
+            {t('Add OpenAI-Compatible-API')}
+          </div>
+        </div>
       </div>
       <CreateCustomModel
         visible={openCreatModal}

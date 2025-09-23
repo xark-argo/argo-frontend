@@ -11,13 +11,13 @@ import './index.css'
 
 function Settings({visible, onClose}) {
   const {t} = useTranslation()
-  const [activeTab, setActiveTab] = useState(SettingMenus[0]?.children?.[1])
+  const [activeTab, setActiveTab] = useState(SettingMenus[1]?.children?.[0])
 
   useEffect(() => {
     setActiveTab(
       localStorage.getItem('enableMultiUser') === 'true'
         ? SettingMenus[0]?.children?.[0]
-        : SettingMenus[0]?.children?.[1]
+        : SettingMenus[1]?.children?.[0]
     )
   }, [])
 
@@ -25,7 +25,7 @@ function Settings({visible, onClose}) {
   return (
     <div>
       <Modal
-        className="modal w-[1000px] rounded-xl border-none"
+        className="modal w-[1200px] rounded-xl border-none"
         visible={visible}
         footer={null}
         maskClosable={false}
