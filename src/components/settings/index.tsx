@@ -11,13 +11,13 @@ import './index.css'
 
 function Settings({visible, onClose}) {
   const {t} = useTranslation()
-  const [activeTab, setActiveTab] = useState(SettingMenus[1]?.children?.[0])
+  const [activeTab, setActiveTab] = useState(SettingMenus[0]?.children?.[0])
 
   useEffect(() => {
     setActiveTab(
       localStorage.getItem('enableMultiUser') === 'true'
         ? SettingMenus[0]?.children?.[0]
-        : SettingMenus[1]?.children?.[0]
+        : SettingMenus[0]?.children?.[0]
     )
   }, [])
 

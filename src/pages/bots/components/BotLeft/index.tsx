@@ -20,6 +20,24 @@ const BotLeft = memo(() => {
 
   return (
     <div className="bg-[#F9F9F9] flex flex-col flex-shrink-0 h-full overflow-hidden w-[250px] px-4">
+      {/* 混沌罗盘LOGO区域 */}
+      <div className="flex-shrink-0 py-4 mb-2">
+        <div className="flex items-center space-x-3 px-2">
+          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+            <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+              <span className="text-white font-bold text-xs">混</span>
+            </div>
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-gray-900">混沌罗盘</h2>
+            <p className="text-xs text-gray-500">{t('Intelligent Platform')}</p>
+          </div>
+        </div>
+      </div>
+      
+      {/* 分隔线 */}
+      <div className="h-[0.5px] bg-[#EBEBEB] w-full mb-2" />
+      
       {MenuRoute.map((item) => (
         <Link
           key={item.name}
@@ -57,17 +75,6 @@ const BotLeft = memo(() => {
               <path fillRule="evenodd" d="M11.983 1.954a1 1 0 00-1.966 0l-.146.878a6.987 6.987 0 00-1.36.79l-.82-.472a1 1 0 00-1.366.366l-.982 1.7a1 1 0 00.366 1.366l.82.474a6.987 6.987 0 000 1.58l-.82.474a1 1 0 00-.366 1.366l.982 1.7a1 1 0 001.366.366l.82-.472c.43.32.88.586 1.36.79l.146.878a1 1 0 001.966 0l.146-.878c.48-.204.93-.47 1.36-.79l.82.472a1 1 0 001.366-.366l.982-1.7a1 1 0 00-.366-1.366l-.82-.474a6.987 6.987 0 000-1.58l.82-.474a1 1 0 00.366-1.366l-.982-1.7a1 1 0 00-1.366-.366l-.82.472a6.987 6.987 0 00-1.36-.79l-.146-.878zM10 12.25a2.25 2.25 0 110-4.5 2.25 2.25 0 010 4.5z" clipRule="evenodd" />
             </svg>
             <span className="truncate">{t('Settings')}</span>
-          </button>
-          <button
-            className="w-full justify-start px-[10px] h-[36px] rounded-[8px] bg-[#EBEBEB] hover:bg-[#E1E1E1] text-[#03060E] text-[14px] font-500 flex items-center"
-            onClick={() => setSettingsVisible(true)}
-          >
-            {/* 简单联系图标 */}
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="mr-[10px] w-4 h-4">
-              <path d="M2.003 5.884A2 2 0 014 4h12a2 2 0 011.997 1.884L10 10.882 2.003 5.884z" />
-              <path d="M18 8.118 10.553 12.89a1 1 0 01-1.106 0L2 8.118V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-            </svg>
-            <span className="truncate">{t('Contact us')}</span>
           </button>
         </div>
       </div>
