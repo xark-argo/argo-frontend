@@ -1,10 +1,10 @@
 import {Button, Message} from '@arco-design/web-react'
-import {useAtom} from 'jotai'
-import React from 'react'
+import {useAtom, useSetAtom} from 'jotai'
+import React, {useEffect, useState} from 'react'
 import {useTranslation} from 'react-i18next'
 import {useHistory} from 'react-router-dom'
 
-import {LOGO} from '~/lib/constants'
+import {LOGO, DEAULT_USER_ICON_SVG} from '~/lib/constants'
 import {currentWorkspace, user} from '~/lib/stores'
 
 function UserProfile() {
@@ -12,6 +12,51 @@ function UserProfile() {
   const history = useHistory()
   const [$user] = useAtom(user)
   const [$currentWorkspace] = useAtom(currentWorkspace)
+  const [userInfo, setUserInfo] = useState({
+    name: '',
+    email: '',
+    role: 'User',
+    id: ''
+  })
+
+  // 获取用户信息
+  useEffect(() => {
+    const getUserInfo = () => {
+      // 从localStorage获取基本信息
+      const email = localStorage.getItem('email') || ''
+      const token = localStorage.getItem('token')
+      
+      // 如果有token，尝试从token中解析用户信息
+      if (token) {
+        try {
+          // 简单的token解析（实际项目中可能需要更复杂的解析）
+          const tokenParts = token.split('.')
+          if (tokenParts.length === 3) {
+            const payload = JSON.parse(atob(tokenParts[1]))
+            setUserInfo({
+              name: payload.name || payload.username || email.split('@')[0] || 'User',
+              email: payload.email || email,
+              role: payload.role || 'User',
+              id: payload.id || payload.sub || 'N/A'
+            })
+            return
+          }
+        } catch (error) {
+          console.warn('Failed to parse token:', error)
+        }
+      }
+      
+      // 回退到localStorage信息
+      setUserInfo({
+        name: email.split('@')[0] || 'User',
+        email: email || 'user@example.com',
+        role: 'User',
+        id: 'N/A'
+      })
+    }
+
+    getUserInfo()
+  }, [])
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -23,47 +68,27 @@ function UserProfile() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('User Profile')}</h2>
-        
         {/* 用户信息卡片 */}
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
           <div className="flex items-center space-x-4 mb-4">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-              <img
-                src={LOGO}
-                alt="User Avatar"
-                className="w-12 h-12 rounded-full object-cover"
+            <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center">
+              <div 
+                dangerouslySetInnerHTML={{ __html: DEAULT_USER_ICON_SVG }}
               />
             </div>
             <div className="flex-1">
               <h3 className="text-lg font-medium text-gray-900">
-                {$user?.name || 'User'}
+                {userInfo.name}
               </h3>
               <p className="text-sm text-gray-500">
-                {$user?.email || localStorage.getItem('email') || 'user@example.com'}
+                {userInfo.email}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                {t('Role')}: {$user?.role || 'User'}
+                {t('Role')}: {userInfo.role}
               </p>
             </div>
           </div>
           
-          <div className="border-t border-gray-100 pt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-500">{t('Workspace')}:</span>
-                <span className="ml-2 font-medium text-gray-900">
-                  {$currentWorkspace.name || 'Default Workspace'}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-500">{t('User ID')}:</span>
-                <span className="ml-2 font-medium text-gray-900">
-                  {$user?.id || 'N/A'}
-                </span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 

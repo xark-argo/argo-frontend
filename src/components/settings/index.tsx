@@ -46,10 +46,8 @@ function Settings({visible, onClose}) {
                     {menu.children
                       .filter((item) => {
                         if (
-                          (platForm() === 'MacOS' &&
-                            item.value === 'Data file') ||
-                          (localStorage.getItem('enableMultiUser') !== 'true' &&
-                            item.value === 'members')
+                          platForm() === 'MacOS' &&
+                          item.value === 'Data file'
                         ) {
                           return false
                         }

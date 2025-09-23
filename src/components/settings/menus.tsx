@@ -1,12 +1,10 @@
 import DataFileIcon from '../icons/DataFile'
 import LanguageIcon from '../icons/LanguageIcon'
-import MemberIcon from '../icons/MemberIcon'
 import KnowledgeImg from '../../layout/assets/icon_knowledge.svg'
 import ModelImg from '../../layout/assets/icon_model.svg'
 import ToolImg from '../../layout/assets/icon_tool.svg'
 import DataFile from './components/DataFile'
 import Language from './components/Language'
-import Members from './components/Members'
 import UserProfile from './components/UserProfile'
 import ContactUs from './components/ContactUs'
 import Models from '~/pages/models/model'
@@ -26,12 +24,6 @@ export const SettingMenus = [
           </svg>
         ),
         comp: () => <UserProfile />,
-      },
-      {
-        value: 'members',
-        text: 'Members',
-        icon: MemberIcon,
-        comp: () => <Members />,
       },
       {
         value: 'language',
@@ -82,4 +74,3 @@ export const SettingMenus = [
   },
 ]
 
-export const MemberTypes = {normal: 'Normal User', admin: 'Admin User'}

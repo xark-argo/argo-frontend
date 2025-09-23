@@ -4,6 +4,7 @@ import React from 'react'
 import {useTranslation} from 'react-i18next'
 
 import FileIcons from '~/components/icons/FileIcons'
+import {CHAT_USER_ICON_SVG} from '~/lib/constants'
 
 import EditMessage from '../EditMessage'
 
@@ -19,10 +20,8 @@ function UserMessage({
   return (
     <div className="flex w-full user-message">
       <div className="flex-shrink-0 mr-3">
-        <div className="size-8 bg-gray-400 rounded-full flex items-center justify-center">
-          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-          </svg>
+        <div className="size-8 bg-blue-500 rounded-full flex items-center justify-center">
+          <div dangerouslySetInnerHTML={{ __html: CHAT_USER_ICON_SVG }} />
         </div>
       </div>
       <div className="w-full overflow-hidden pl-1">
