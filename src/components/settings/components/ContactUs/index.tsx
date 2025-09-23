@@ -7,8 +7,6 @@ function ContactUs() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('Contact Us')}</h2>
-        
         {/* 混沌罗盘信息 */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-6">
           <div className="flex items-center space-x-4 mb-4">
