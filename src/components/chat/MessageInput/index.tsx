@@ -407,6 +407,7 @@ function MessageInput({
               <div className="flex items-center gap-1">
                 <Tooltip content={t('New Chat')}>
                   <button
+                    type="button"
                     onClick={onNewChat}
                     className="bg-[#f2f2f2] border-[0.5px] text-[#03060E] cursor-pointer w-[30px] h-[30px] border-[#AEAFB366] flex items-center justify-center rounded-[6px] hover:bg-[#e8e8e8] transition-colors"
                   >
@@ -415,6 +416,7 @@ function MessageInput({
                 </Tooltip>
                 <Tooltip content={t('Clear')}>
                   <button
+                    type="button"
                     onClick={onClearChat}
                     className="bg-[#f2f2f2] border-[0.5px] text-[#03060E] cursor-pointer w-[30px] h-[30px] border-[#AEAFB366] flex items-center justify-center rounded-[6px] hover:bg-[#e8e8e8] transition-colors"
                   >
