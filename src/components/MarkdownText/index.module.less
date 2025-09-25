@@ -3,6 +3,11 @@
 .markdown-body {
   background: transparent;
   color: #03060E !important;
+  /* 修正局部断词和强制换行，避免粗体和括号被拆分 */
+  word-break: normal !important;
+  overflow-wrap: break-word;
+  /* 防止时间信息被不正确地分割 */
+  white-space: normal;
   // white-space: pre-wrap !important;
   code {
     white-space: break-spaces !important;
@@ -14,6 +19,10 @@
   }
   p {
     white-space: pre-line;
+  }
+  /* 覆盖全局 strong 样式，避免 inline-block 造成的断行 */
+  strong {
+    display: inline;
   }
   li {
     list-style: initial !important;

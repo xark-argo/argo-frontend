@@ -16,8 +16,6 @@ import ReactMarkdown from 'react-markdown'
 import {Prism as SyntaxHighlighter} from 'react-syntax-highlighter'
 import {oneLight} from 'react-syntax-highlighter/dist/esm/styles/prism'
 import rehypeKatex from 'rehype-katex'
-import rehypeRaw from 'rehype-raw'
-import rehypeReact from 'rehype-react'
 import remarkDirective from 'remark-directive'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -310,6 +308,16 @@ function MarkdownText({message, isSending = false}) {
       math: MathBlock,
       inlineMath: InlineMath,
       img: CustomImage,
+      // 恢复时间分隔符
+      p: ({children, ...props}) => {
+        const processedChildren = React.Children.map(children, (child) => {
+          if (typeof child === 'string') {
+            return child.replace(/__TIME_SEPARATOR__/g, ':')
+          }
+          return child
+        })
+        return <p {...props}>{processedChildren}</p>
+      },
     }),
     [thinkType]
   )
@@ -326,6 +334,9 @@ function MarkdownText({message, isSending = false}) {
     if (!text) return text
     let newText = text
 
+    // 防止冒号被remarkDirective插件误处理，使用特殊标记替换时间格式
+    newText = newText.replace(/(\d{1,2}):(\d{2})/g, '$1__TIME_SEPARATOR__$2')
+
     if (/<think\b[^>]*>/i.test(newText) && !/<\/think>/i.test(newText)) {
       newText = `${newText}\n</think>`
     }
@@ -338,14 +349,6 @@ function MarkdownText({message, isSending = false}) {
       ?.replace(/<think>/g, ':::think\n')
       ?.replace(/<\/think>/g, '\n:::\n')
     return returnText
-    // ?.replace(/<think>([\s\S]*?)<\/think>/gi, (_, content) => {
-    //   const lines = content
-    //     .trim()
-    //     .split('\n')
-    //     .map((line: string) => (line ? `> ${line}` : '>'))
-    //     .join('\n')
-    //   return lines
-    // })
   }
 
   return (
@@ -353,8 +356,6 @@ function MarkdownText({message, isSending = false}) {
       <ReactMarkdown
         remarkPlugins={[remarkMath, remarkGfm, remarkDirective, thinkPlugin]}
         rehypePlugins={[
-          [rehypeReact, {createElement: React.createElement}],
-          rehypeRaw,
           rehypeKatex,
         ]}
         components={components}
