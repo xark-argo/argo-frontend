@@ -144,7 +144,8 @@ function MessageItem({
         Message.error(`Please Enter Variable ${emptyArrays[0][itemType].label}`)
         return
       }
-      setDeleteInfo((pre) => ({...pre, delete_answer: false}))
+      // 参照 deleteHandler 的方式，先清空消息渲染
+      setDeleteInfo((pre) => ({...pre, delete_answer: true}))
       if (loadingRef.current) return
       chat.answer = ''
       chat.agent_thoughts = []
@@ -236,6 +237,8 @@ function MessageItem({
           if (data.event === 'message') {
             // message sending
             requestAnimationFrame(async () => {
+              // 开始接收消息时，重置 delete_answer 状态，让消息重新显示
+              setDeleteInfo((pre) => ({...pre, delete_answer: false}))
               if (data.metadata?.langgraph_node?.includes('reporter')) {
                 setOpenPlan(true)
               }
