@@ -73,14 +73,6 @@ function Auth() {
               {t(' to ')}
               {$WEBUI_NAME}
             </div>
-            {mode === 'signup' ? (
-              <div className=" mt-1 text-xs font-600 text-gray-500">
-                ⓘ
-                {t(
-                  'Argo does not make any external connections, and your data stays securely on your locally hosted server.'
-                )}
-              </div>
-            ) : null}
           </div>
 
           <div className="flex flex-col mt-4">

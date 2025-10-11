@@ -1,6 +1,6 @@
 import {atom} from 'jotai'
 
-export const WEBUI_NAME = atom('Argo')
+export const WEBUI_NAME = atom(' 混沌罗盘-金融智能体平台')
 
 export const workspaces = atom([])
 export const currentWorkspace = atom({id: 0, name: '', current: false})
