@@ -74,3 +74,9 @@ export const SettingMenus = [
   },
 ]
 
+export const MemberTypes = {
+  normal: 'Normal User',
+  admin: 'Admin',
+  owner: 'Owner'
+}
+

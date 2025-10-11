@@ -92,7 +92,7 @@ function AddMemberModal({visible, onClose, onAdd}) {
                     </span>
                     <div className=" flex flex-col flex-grow">
                       <span className="font-medium capitalize block truncate">
-                        {val}
+                        {String(val)}
                       </span>
                     </div>
                   </div>
