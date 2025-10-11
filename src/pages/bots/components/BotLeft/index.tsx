@@ -9,6 +9,8 @@ import {activeChat, currentWorkspace} from '~/lib/stores'
 import {MenuRoute} from '../../menuConfig'
 import ChatList from '../ChatList'
 import Settings from '~/components/settings'
+import argoImage from '~/pages/models/images/argoImage'
+import { LOGO } from '~/lib/constants'
 
 const BotLeft = memo(() => {
   const {pathname} = useLocation()
@@ -23,10 +25,12 @@ const BotLeft = memo(() => {
       {/* 混沌罗盘LOGO区域 */}
       <div className="flex-shrink-0 py-4 mb-2">
         <div className="flex items-center space-x-3 px-2">
-          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-            <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-xs">混</span>
-            </div>
+          <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center overflow-hidden">
+            <img 
+              src={LOGO} 
+              alt="混沌罗盘" 
+              className="w-full h-full object-cover rounded-full" 
+            />
           </div>
           <div>
             <h2 className="text-sm font-bold text-gray-900">混沌罗盘</h2>
