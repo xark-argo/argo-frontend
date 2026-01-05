@@ -1,4 +1,4 @@
-import {Button, Message, Radio} from '@arco-design/web-react'
+import {Button, Message, Radio, Tooltip} from '@arco-design/web-react'
 import {IconDelete, IconEmpty} from '@arco-design/web-react/icon'
 import {useAtom} from 'jotai'
 import {useEffect, useState} from 'react'
@@ -9,18 +9,22 @@ import ArgoModal from '~/components/Modal'
 import OverflowTooltip from '~/components/OverflowTooltip'
 import {getMCPList} from '~/lib/apis/mcpTools'
 import {currentWorkspace} from '~/lib/stores'
+import {modelSupportsTools} from '~/lib/utils'
 import IconTool from '~/pages/assets/ic_tool.svg'
 import IconTitleTool from '~/pages/assets/tool.svg'
 
 import ItemContainer from '../ItemContainer'
 
-function ToolsItem({value, onChange, addToolKey}) {
+function ToolsItem({value, onChange, addToolKey, modelList, currentModelId}) {
   const {t} = useTranslation()
   const [$currentWorkspace] = useAtom(currentWorkspace)
   const [selectedList, setSelectedList] = useState([])
   const [list, setList] = useState([])
   // const [selected, setSelected] = useState<any>(undefined)
   const [visible, setVisible] = useState(false)
+
+  const model = modelList?.find((item) => item.id === currentModelId)
+  const supportsTools = modelSupportsTools(model)
 
   const getList = async () => {
     try {
@@ -183,14 +187,24 @@ function ToolsItem({value, onChange, addToolKey}) {
 
   const renderIcon = () => <img src={IconTitleTool} alt="" />
 
+  const handleAddClick = () => {
+    if (!supportsTools) {
+      Message.warning(
+        t('The current model does not support tool calling, please switch to a model that supports tool calling')
+      )
+      return
+    }
+    setVisible(true)
+  }
+
   return (
     <div className="overflow-hidden">
       <ItemContainer
         title={t('Tools')}
         icon={renderIcon}
-        onAdd={() => {
-          setVisible(true)
-        }}
+        onAdd={supportsTools ? handleAddClick : undefined}
+        disabled={!supportsTools}
+        disabledReason={t('The current model does not support tool calling, please switch to a model that supports tool calling')}
       >
         {value
           .filter((v) => v.type === 'mcp_tool' && v.enabled)

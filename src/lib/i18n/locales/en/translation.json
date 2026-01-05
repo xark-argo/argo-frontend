@@ -135,5 +135,11 @@
   "noModelPart2": "to configure",
   "embeddingModel": "EmbeddingModel",
   "documents number": "A total of {{number}} documents",
-  "total size": ",Total file size {{size}}"
+  "total size": ",Total file size {{size}}",
+  "documentation": "documentation",
+  "and": "and",
+  "for more details": "for more details",
+  "Deep Research": "Deep Research",
+  "Please enable at least one tool before enabling Deep Research": "Please enable at least one tool before enabling Deep Research",
+  "The current model does not support tool calling, please switch to a model that supports tool calling": "The current model does not support tool calling, please switch to a model that supports tool calling"
 }

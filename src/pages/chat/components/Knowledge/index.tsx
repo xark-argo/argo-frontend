@@ -13,6 +13,7 @@ import {deleteDocument} from '~/lib/apis/documents'
 import {getKnowledgeDetailInfo} from '~/lib/apis/knowledge'
 import {activeChat} from '~/lib/stores'
 import {botDetail, selectedKnowledge} from '~/lib/stores/chat'
+import {updateAgentModeByTools} from '~/lib/utils'
 
 import AddDoc from '../AddDoc'
 import AddText from '../AddText'
@@ -56,6 +57,11 @@ function Knowledge({refreshBot}) {
         .map((v) => v.partition_name)
 
       $botDetail.model_config.agent_mode.tools = tools
+      $botDetail.model_config.agent_mode = updateAgentModeByTools(
+        $botDetail.model_config.agent_mode,
+        $botDetail.model_config.agent_mode.tools
+      )
+      
       setActiveChat({...$activeChat})
       setBotDetail({...$botDetail})
     }

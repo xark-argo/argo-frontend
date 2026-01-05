@@ -469,6 +469,45 @@ function SupplierModel({getModelProvider, setEditing, deleteProvider}) {
                 .map((item, index) => modelItem(item, index))}
             </div>
           ) : null}
+          {($selectModelProvider.credentials.doc_url ||
+            $selectModelProvider.credentials.model_url) && (
+            <div className="mt-3 text-[#565759] text-[12px]">
+              {t('View')}{' '}
+              {$selectModelProvider.credentials.doc_url ? (
+                <a
+                  href={$selectModelProvider.credentials.doc_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[#133EBF]"
+                >
+                  {$selectModelProvider.credentials.custom_name ||
+                    t($selectModelProvider.label)}{' '}
+                  {t('documentation')}
+                </a>
+              ) : (
+                <>
+                  {$selectModelProvider.credentials.custom_name ||
+                    t($selectModelProvider.label)}{' '}
+                  {t('documentation')}
+                </>
+              )}
+              {$selectModelProvider.credentials.doc_url &&
+                $selectModelProvider.credentials.model_url && (
+                  <> {t('and')} </>
+                )}
+              {$selectModelProvider.credentials.model_url ? (
+                <a
+                  href={$selectModelProvider.credentials.model_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[#133EBF]"
+                >
+                  {t('model')}
+                </a>
+              ) : null}{' '}
+              {t('for more details')}
+            </div>
+          )}
         </div>
       </div>
 

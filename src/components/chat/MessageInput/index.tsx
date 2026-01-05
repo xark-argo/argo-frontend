@@ -294,9 +294,39 @@ function MessageInput({
               <div className="grid py-1 grid-cols-2 gap-2 max-h-[144px] overflow-scroll no-scrollbar">
                 {filelist.map((file) => (
                   <div className="relative group" key={file.uid}>
-                    <Tooltip
-                      content={file.document_status === 2 ? file.msg : ''}
-                    >
+                    {file.document_status === 2 ? (
+                      <Tooltip content={file.msg}>
+                        <div className="h-[62px] flex items-center gap-[10px] px-[10px] py-[13px] rounded-xl border border-[#EBEBEB] bg-white box-border">
+                        {file.name?.split('.').pop() !== 'png' ? (
+                          <FileIcons
+                            type={file.name?.split('.').pop()}
+                            className="w-9 h-9"
+                          />
+                        ) : (
+                          <Image
+                            width={42}
+                            height={42}
+                            src={file.url}
+                            className="overflow-hidden"
+                          />
+                        )}
+                        <div className="flex flex-col justify-center ">
+                          <div className="text-[14px] font-medium line-clamp-1 text-[#03060E] font-500">
+                            {file.name}
+                          </div>
+                          {file.file_type === 'png' ? (
+                            <div className="text-[#AEAFB3] text-[10px] mt-[3px]">
+                              Image {renderDownloadStatus(file)}
+                            </div>
+                          ) : (
+                            <div className="text-[#AEAFB3] text-[10px] mt-[3px]">
+                              Document {renderDownloadStatus(file)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      </Tooltip>
+                    ) : (
                       <div className="h-[62px] flex items-center gap-[10px] px-[10px] py-[13px] rounded-xl border border-[#EBEBEB] bg-white box-border">
                         {file.name?.split('.').pop() !== 'png' ? (
                           <FileIcons
@@ -326,7 +356,7 @@ function MessageInput({
                           )}
                         </div>
                       </div>
-                    </Tooltip>
+                    )}
                     <div className="absolute -top-1 -right-1">
                       <button
                         className=" group-hover:visible invisible transition"
@@ -410,27 +440,29 @@ function MessageInput({
                       'Currently supports uploading files in txt, docx, xlsx, xls, pptx, ppt, pdf, markdown, json, html, csv formats'
                     )}
                   >
-                    <UploadPngIcon
-                      onChange={handleSetImg}
-                      limit={
-                        10 -
-                        (filelistRef.current?.filter((v) => v.type === 'image')
-                          ?.length || 0)
-                      }
-                      disabled={
-                        uploading.current ||
-                        !isVision ||
-                        filelistRef.current.filter((v) => v.type === 'image')
-                          ?.length >= 10
-                      }
-                      disabledMsg={
-                        !isVision
-                          ? t(
-                              'The current model does not support visual recognition. Please switch to a visual model and then use it.'
-                            )
-                          : ''
-                      }
-                    />
+                    <div>
+                      <UploadPngIcon
+                        onChange={handleSetImg}
+                        limit={
+                          10 -
+                          (filelistRef.current?.filter((v) => v.type === 'image')
+                            ?.length || 0)
+                        }
+                        disabled={
+                          uploading.current ||
+                          !isVision ||
+                          filelistRef.current.filter((v) => v.type === 'image')
+                            ?.length >= 10
+                        }
+                        disabledMsg={
+                          !isVision
+                            ? t(
+                                'The current model does not support visual recognition. Please switch to a visual model and then use it.'
+                              )
+                            : ''
+                        }
+                      />
+                    </div>
                   </Tooltip>
                 ) : null}
                 {showUpload ? (
@@ -439,20 +471,22 @@ function MessageInput({
                       'Currently supports uploading files in txt, docx, xlsx, xls, pptx, ppt, pdf, markdown, json, html, csv formats'
                     )}
                   >
-                    <UploadFileListIcon
-                      onChange={handleSetFiles}
-                      limit={
-                        20 -
-                        (filelistRef.current?.filter(
-                          (v) => v.type === 'document'
-                        )?.length || 0)
-                      }
-                      disabled={
-                        uploading.current ||
-                        filelistRef.current.filter((v) => v.type === 'document')
-                          ?.length >= 20
-                      }
-                    />
+                    <div>
+                      <UploadFileListIcon
+                        onChange={handleSetFiles}
+                        limit={
+                          20 -
+                          (filelistRef.current?.filter(
+                            (v) => v.type === 'document'
+                          )?.length || 0)
+                        }
+                        disabled={
+                          uploading.current ||
+                          filelistRef.current.filter((v) => v.type === 'document')
+                            ?.length >= 20
+                        }
+                      />
+                    </div>
                   </Tooltip>
                 ) : null}
                 <Tooltip content={t('Send message')}>

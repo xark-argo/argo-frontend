@@ -16,6 +16,7 @@ import {stopBotSay} from '~/lib/apis/chats'
 import {WEBUI_API_BASE_URL} from '~/lib/constants'
 import {openPlan} from '~/lib/stores'
 import {chatsLoading} from '~/lib/stores/chat'
+import {modelSupportsTools, updateAgentModeByTools} from '~/lib/utils'
 import ClearIcon from '~/pages/assets/ClearIcon.svg'
 import QuickBack from '~/pages/chat/components/QuickBack'
 import {awaitTime} from '~/utils'
@@ -171,6 +172,29 @@ function MessageContainer({
     isUserScroll.current = false
     setLoading(newChat.id)
     setOpenPlan(false)
+    
+    const currentModel = modelList?.find(
+      (item) => item.id === detail?.model_config?.model?.model_id
+    )
+    const supportsTools = modelSupportsTools(currentModel)
+    
+    let agentMode = {
+      max_iteration: 4,
+      strategy: 'react',
+      tools: [],
+      prompt: null,
+      ...detail?.model_config?.agent_mode,
+    }
+    
+    if (!supportsTools) {
+      agentMode.enabled = false
+    } else {
+      agentMode = updateAgentModeByTools(
+        agentMode,
+        agentMode.tools || []
+      )
+    }
+    
     const params = {
       invoke_from: 'debugger',
       message,
@@ -182,14 +206,7 @@ function MessageContainer({
       ...detail,
       model_config: {
         ...detail.model_config,
-        agent_mode: {
-          max_iteration: 4,
-          enabled: true,
-          strategy: 'react',
-          tools: [],
-          prompt: null,
-          ...detail?.model_config?.agent_mode,
-        },
+        agent_mode: agentMode,
       },
     }
 

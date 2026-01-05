@@ -67,3 +67,50 @@ export const platForm = () => {
   }
   return system
 }
+
+/**
+ * 检查工具列表中是否有启用的工具
+ * @param tools 工具列表
+ * @returns 是否有启用的工具
+ */
+export const hasEnabledTools = (tools: any[] = []): boolean => {
+  return tools.some((tool) => tool.enabled === true)
+}
+
+/**
+ * 检查模型是否支持工具调用
+ * @param model 模型对象
+ * @returns 是否支持工具调用
+ */
+export const modelSupportsTools = (model: any): boolean => {
+  if (!model?.category) {
+    return false
+  }
+  const category = model.category
+  if (!category?.category_label?.category || category.category_label.category.length === 0) {
+    return false
+  }
+  return category.category_label.category.some(
+    (item: any) => item?.category === 'tools'
+  )
+}
+
+/**
+ * 根据工具列表更新 agent_mode 的状态
+ * @param agentMode agent_mode 对象
+ * @param tools 工具列表
+ * @returns 更新后的 agent_mode 对象
+ */
+export const updateAgentModeByTools = (
+  agentMode: any,
+  tools: any[] = []
+): any => {
+  const enabled = hasEnabledTools(tools)
+  const isDeepResearch = agentMode?.strategy === 'react_deep_research'
+
+  return {
+    ...agentMode,
+    enabled,
+    strategy: enabled && isDeepResearch ? 'react_deep_research' : 'tool_call',
+  }
+}

@@ -58,9 +58,12 @@ function BotDetailChat({
 
   return (
     <div
-      className=" min-w-100 overflow-hidden relative flex-1 flex"
+      className="min-w-100 overflow-hidden relative flex-1 flex"
       style={{
-        background: `url(${detail.background_img}) no-repeat center / 100% 100%`,
+        backgroundImage: `url(${detail.background_img})`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'center top',
+        backgroundSize: 'cover',
       }}
     >
       <div

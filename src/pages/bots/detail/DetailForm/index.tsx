@@ -3,7 +3,7 @@ import React, {useEffect, useState} from 'react'
 import {useTranslation} from 'react-i18next'
 
 import {updateBotConfig} from '~/lib/apis/bots'
-import {mergeObjects} from '~/lib/utils'
+import {mergeObjects, hasEnabledTools, updateAgentModeByTools, modelSupportsTools} from '~/lib/utils'
 
 import BotSetting from './BotSetting'
 import DeepResearchItem from './DeepResearchItem'
@@ -26,8 +26,12 @@ function DetailForm({detail, changeDetail, modelList, handleSaveInfo}) {
   const handleChangeKnowledge = (val) => {
     const mcpTools = detail?.model_config?.agent_mode?.tools?.filter(
       (v) => v.type === 'mcp_tool'
-    )
+    ) || []
     detail.model_config.agent_mode.tools = [...mcpTools, ...val]
+    detail.model_config.agent_mode = updateAgentModeByTools(
+      detail.model_config.agent_mode,
+      detail.model_config.agent_mode.tools
+    )
     changeDetail({...detail})
   }
 
@@ -38,6 +42,12 @@ function DetailForm({detail, changeDetail, modelList, handleSaveInfo}) {
 
   const handleChangeTools = (val, type, value) => {
     if (type === 'deep_research' && value) {
+      if (!hasEnabledTools(detail?.model_config?.agent_mode?.tools)) {
+        Message.warning(
+          t('Please enable at least one tool before enabling Deep Research')
+        )
+        return
+      }
       const newConfigs = {...detail.model_config}
       newConfigs.agent_mode.strategy = 'react_deep_research'
       newConfigs.agent_mode.enabled = true
@@ -45,47 +55,27 @@ function DetailForm({detail, changeDetail, modelList, handleSaveInfo}) {
       detail.model_config = newConfigs
       changeDetail({...detail})
     } else if (type === 'deep_research' && !value) {
-      const tools = detail?.model_config?.agent_mode?.tools?.filter(
-        (v) => v.type !== 'dataset'
-      )
-      if (tools.length) {
-        detail.model_config.agent_mode.strategy = 'tool_call'
-        detail.model_config.agent_mode.enabled = true
-      } else {
-        detail.model_config.agent_mode.strategy = 'tool_call'
-        detail.model_config.agent_mode.enabled = false
+      const tools = detail?.model_config?.agent_mode?.tools || []
+      const updatedAgentMode = {
+        ...detail.model_config.agent_mode,
+        strategy: 'tool_call'
       }
+      detail.model_config.agent_mode = updateAgentModeByTools(
+        updatedAgentMode,
+        tools
+      )
       changeDetail({...detail})
     } else {
       const knowledge = detail?.model_config?.agent_mode?.tools?.filter(
         (v) => v.type === 'dataset'
-      )
+      ) || []
       detail.model_config.agent_mode.tools = [...knowledge, ...val]
-      if (val.length > 0) {
-        detail.model_config.agent_mode.strategy =
-          detail.model_config.agent_mode.strategy === 'react_deep_research'
-            ? 'react_deep_research'
-            : 'tool_call'
-        detail.model_config.agent_mode.enabled = true
-      } else if (
-        detail.model_config.agent_mode.strategy !== 'react_deep_research' ||
-        !detail.model_config.agent_mode.enabled
-      ) {
-        // 没开启深度调研
-        detail.model_config.agent_mode.enabled = false
-      }
+      detail.model_config.agent_mode = updateAgentModeByTools(
+        detail.model_config.agent_mode,
+        detail.model_config.agent_mode.tools
+      )
       changeDetail({...detail})
     }
-    // const knowledge = detail?.model_config?.agent_mode?.tools?.filter(
-    //   (v) => v.type === 'dataset'
-    // )
-    // detail.model_config.agent_mode.tools = [...knowledge, ...val]
-    // if (val.length > 0) {
-    //   detail.model_config.agent_mode.enabled = true
-    // } else {
-    //   detail.model_config.agent_mode.enabled = false
-    // }
-    // changeDetail({...detail})
   }
 
   const handleChangeVariable = (val) => {
@@ -110,7 +100,6 @@ function DetailForm({detail, changeDetail, modelList, handleSaveInfo}) {
     } catch (err) {
       Message.error(err.msg || 'Server error, try again later')
     }
-    // changeDetail({...detail})
   }
 
   const handleChangeModelConfig = (vals) => {
@@ -121,22 +110,15 @@ function DetailForm({detail, changeDetail, modelList, handleSaveInfo}) {
   }
 
   const handleDeepResearch = (value) => {
-    // const newConfigs = {...detail.model_config}
-    // if (value) {
-    //   newConfigs.agent_mode.strategy = 'react_deep_research'
-    //   newConfigs.agent_mode.enabled = true
-    //   form.setFieldValue('model_config', newConfigs)
-    //   detail.model_config = newConfigs
-    //   changeDetail({...detail})
-    // } else {
-    //   const tools = detail?.model_config?.agent_mode?.tools?.filter(
-    //     (v) => v.type !== 'dataset'
-    //   )
-    //   handleChangeTools(tools, value)
-    // }
+    if (value && !hasEnabledTools(detail?.model_config?.agent_mode?.tools)) {
+      Message.warning(
+        t('Please enable at least one tool before enabling Deep Research')
+      )
+      return
+    }
     const tools = detail?.model_config?.agent_mode?.tools?.filter(
       (v) => v.type !== 'dataset'
-    )
+    ) || []
     handleChangeTools(tools, 'deep_research', value)
   }
 
@@ -207,6 +189,8 @@ function DetailForm({detail, changeDetail, modelList, handleSaveInfo}) {
             value={detail?.model_config?.agent_mode?.tools}
             onChange={handleChangeKnowledge}
             addKnowledgeKey={addKnowledgeKey}
+            modelList={modelList}
+            currentModelId={detail?.model_config?.model?.model_id}
           />
           <VariableItem
             value={detail?.model_config?.user_input_form}
@@ -217,6 +201,8 @@ function DetailForm({detail, changeDetail, modelList, handleSaveInfo}) {
             value={detail?.model_config?.agent_mode?.tools}
             onChange={handleChangeTools}
             addToolKey={addToolKey}
+            modelList={modelList}
+            currentModelId={detail?.model_config?.model?.model_id}
           />
           {detail.category === 'roleplay' ? (
             <PluginsItem

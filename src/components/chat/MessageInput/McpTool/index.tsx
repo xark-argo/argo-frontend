@@ -1,9 +1,10 @@
-import {Modal, Tooltip} from '@arco-design/web-react'
+import {Message, Modal, Tooltip} from '@arco-design/web-react'
 import {useAtom} from 'jotai'
 import React, {useEffect, useState} from 'react'
 import {useTranslation} from 'react-i18next'
 
 import {activeChat} from '~/lib/stores'
+import {hasEnabledTools} from '~/lib/utils'
 
 import IconTool from '../IconTool'
 import ToolPopover from './ToolPopover'
@@ -26,6 +27,8 @@ function ToolSelector({
   const [tipType, setTipType] = useState<number>(0)
   const [$activeChat] = useAtom(activeChat)
   const [showModal, setShowModal] = useState(false)
+  const [deepResearchDisabled, setDeepResearchDisabled] = useState(false)
+  const [deepResearchDisableReason, setDeepResearchDisableReason] = useState('')
 
   const checkTipType = () => {
     if (
@@ -43,9 +46,39 @@ function ToolSelector({
       setTipType(1)
     }
   }
+  
+  const checkDeepResearchAvailability = () => {
+    const modelNotSupportTools =
+      model &&
+      model?.category &&
+      (model?.category?.category_label.category.length === 0 ||
+        model?.category?.category_label?.category?.findIndex(
+          (item) => item.category === 'tools'
+        ) === -1)
+    
+    const allTools = $activeChat?.detail?.model_config?.agent_mode?.tools || []
+    const noTools = !hasEnabledTools(allTools)
+    
+    const disable = modelNotSupportTools || noTools
+    setDeepResearchDisabled(disable)
+    
+    if (modelNotSupportTools) {
+      setDeepResearchDisableReason(
+        t('The current model does not support tool calling, please switch to a model that supports tool calling')
+      )
+    } else if (noTools) {
+      setDeepResearchDisableReason(
+        t('Please enable at least one tool before enabling Deep Research')
+      )
+    } else {
+      setDeepResearchDisableReason('')
+    }
+  }
+  
   useEffect(() => {
     checkTipType()
-  }, [model, tools])
+    checkDeepResearchAvailability()
+  }, [model, tools, enabled, $activeChat?.detail?.model_config?.agent_mode?.tools])
 
   useEffect(() => {
     if (tipType === -1) {
@@ -53,9 +86,48 @@ function ToolSelector({
     }
   }, [tipType])
 
+  const handleDeepResearchClick = () => {
+    const el = document.querySelector('#interruptOptionsID')
+    const strategy =
+      $activeChat?.agent_mode?.strategy ||
+      $activeChat?.detail?.model_config?.agent_mode?.strategy
+    
+    if (strategy !== 'react_deep_research') {
+      const allTools = $activeChat?.detail?.model_config?.agent_mode?.tools || []
+      if (!hasEnabledTools(allTools)) {
+        Message.warning(
+          t('Please enable at least one tool before enabling Deep Research')
+        )
+        return
+      }
+    }
+    
+    if (tipType === -1 || deepResearchDisabled) {
+      return
+    }
+    
+    if (el && strategy === 'react_deep_research') {
+      setShowModal(true)
+      return
+    }
+    
+    handleChangeDeepSearch(
+      strategy === 'react_deep_research'
+        ? 'tool_call'
+        : 'react_deep_research'
+    )
+  }
+
   return (
     <div className={className}>
-      <Tooltip content={t('Deep Research')}>
+      <Tooltip
+        content={
+          deepResearchDisabled && deepResearchDisableReason
+            ? deepResearchDisableReason
+            : t('Deep Research')
+        }
+        disabled={!deepResearchDisabled}
+      >
         <div
           className={`border-[0.5px] flex items-center h-[30px] px-1 mr-1 rounded-md text-[12px] ${
             $activeChat?.agent_mode?.strategy === 'react_deep_research' ||
@@ -63,25 +135,12 @@ function ToolSelector({
               'react_deep_research'
               ? 'border-[#9bafe4] bg-[#f2f6ff]'
               : 'bg-[#f2f2f2]'
-          } ${tipType === -1 ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-          onClick={() => {
-            const el = document.querySelector('#interruptOptionsID')
-            if (tipType === -1) {
-              return
-            }
-            const strategy =
-              $activeChat?.agent_mode?.strategy ||
-              $activeChat?.detail?.model_config?.agent_mode?.strategy
-            if (el && strategy === 'react_deep_research') {
-              setShowModal(true)
-              return
-            }
-            handleChangeDeepSearch(
-              strategy === 'react_deep_research'
-                ? 'tool_call'
-                : 'react_deep_research'
-            )
-          }}
+          } ${
+            tipType === -1 || deepResearchDisabled
+              ? 'cursor-not-allowed opacity-60'
+              : 'cursor-pointer'
+          }`}
+          onClick={handleDeepResearchClick}
         >
           <svg
             className="icon"

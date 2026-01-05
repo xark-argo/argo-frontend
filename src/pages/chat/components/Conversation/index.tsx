@@ -16,6 +16,7 @@ import {deleteMessages, getConversationDetail} from '~/lib/apis/conversations'
 import {WEBUI_API_BASE_URL} from '~/lib/constants'
 import TaskQueue from '~/lib/model/taskQueue'
 import {activeChat, openPlan} from '~/lib/stores'
+import {hasEnabledTools, updateAgentModeByTools, modelSupportsTools} from '~/lib/utils'
 import {
   botDetail,
   chatsLoading,
@@ -229,29 +230,27 @@ function Conversation({
   }
 
   const handleChangeModel = (model) => {
-    if (
-      model?.category?.category_label?.category?.findIndex(
-        (v) => v.category === 'tools'
-      ) < 0
-    ) {
-      $botDetail.model_config.agent_mode.enabled = false
-    } else if (
-      model?.category?.category_label?.category?.findIndex(
-        (v) => v.category === 'tools'
-      ) > -1 &&
-      $botDetail.model_config.agent_mode.tools.filter(
-        (v) => v.type === 'mcp_tool' && v.enabled
-      ).length > 0
-    ) {
-      $botDetail.model_config.agent_mode.enabled = true
-    }
     $botDetail.model_config.model = {
       ...$botDetail.model_config.model,
       name: model.model_name,
       model_id: model.id,
       provider: model.provider,
     }
+    
+    const supportsTools = modelSupportsTools(model)
+    
+    if (!supportsTools) {
+      $botDetail.model_config.agent_mode.enabled = false
+    } else {
+      $botDetail.model_config.agent_mode = updateAgentModeByTools(
+        $botDetail.model_config.agent_mode,
+        $botDetail.model_config.agent_mode.tools || []
+      )
+    }
+    
     $activeChat.detail.model_config = $botDetail.model_config
+    $activeChat.detail.model_config.agent_mode.enabled = $botDetail.model_config.agent_mode.enabled
+    $activeChat.detail.model_config.agent_mode.strategy = $botDetail.model_config.agent_mode.strategy
     setActiveChat(cloneDeep($activeChat))
     setBotDetail(cloneDeep($botDetail))
   }
@@ -261,11 +260,15 @@ function Conversation({
       (v) => v.type === 'dataset'
     )
     $botDetail.model_config.agent_mode.tools = [...knowledgeList, ...value]
-    const enabled =
-      value.length > 0 && value.filter((v) => v.enabled).length > 0
-    $botDetail.model_config.agent_mode.enabled = enabled
+    $botDetail.model_config.agent_mode = updateAgentModeByTools(
+      $botDetail.model_config.agent_mode,
+      $botDetail.model_config.agent_mode.tools
+    )
+    
     setBotDetail(cloneDeep($botDetail))
     $activeChat.detail.model_config = $botDetail.model_config
+    $activeChat.detail.model_config.agent_mode.enabled = $botDetail.model_config.agent_mode.enabled
+    $activeChat.detail.model_config.agent_mode.strategy = $botDetail.model_config.agent_mode.strategy
     setActiveChat(cloneDeep($activeChat))
   }
 
@@ -275,20 +278,18 @@ function Conversation({
     ) {
       return
     }
-    const tools = $botDetail.model_config.agent_mode.tools.filter(
-      (v) => v.type !== 'dataset'
-    )
-    if (value !== 'react_deep_research' && !tools?.length) {
-      $botDetail.model_config.agent_mode.enabled = false
-    } else {
-      $botDetail.model_config.agent_mode.enabled = true
-    }
     $botDetail.model_config.agent_mode.strategy = value
+    $botDetail.model_config.agent_mode = updateAgentModeByTools(
+      $botDetail.model_config.agent_mode,
+      $botDetail.model_config.agent_mode.tools
+    )
+    
     setBotDetail(cloneDeep($botDetail))
     if ($activeChat?.agent_mode?.strategy) {
       $activeChat.agent_mode.strategy = value
     }
     $activeChat.detail.model_config.agent_mode.strategy = value
+    $activeChat.detail.model_config.agent_mode.enabled = $botDetail.model_config.agent_mode.enabled
     setActiveChat(cloneDeep($activeChat))
   }
 
@@ -348,17 +349,22 @@ function Conversation({
     isUserScroll.current = false
     setLoading(newChat.id)
     setOpenPlan(false)
-    if ($activeChat?.agent_mode?.strategy === 'react_deep_research') {
-      $activeChat.detail.model_config.agent_mode.strategy =
-        'react_deep_research'
-    }
-    if (
-      [
-        $activeChat.detail.model_config.agent_mode.strategy,
-        $activeChat?.agent_mode?.strategy,
-      ].includes('react_deep_research')
-    ) {
-      $activeChat.detail.model_config.agent_mode.enabled = true
+    
+    const currentModel = models.find(
+      (item) => item.id === $activeChat.detail.model_config?.model?.model_id
+    )
+    const supportsTools = modelSupportsTools(currentModel)
+    
+    if (!supportsTools) {
+      $activeChat.detail.model_config.agent_mode.enabled = false
+    } else {
+      if ($activeChat?.agent_mode?.strategy === 'react_deep_research') {
+        $activeChat.detail.model_config.agent_mode.strategy = 'react_deep_research'
+      }
+      $activeChat.detail.model_config.agent_mode = updateAgentModeByTools(
+        $activeChat.detail.model_config.agent_mode,
+        $activeChat.detail.model_config.agent_mode.tools || []
+      )
     }
     const params = {
       invoke_from: 'web-app',

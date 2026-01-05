@@ -40,6 +40,8 @@ export const selectModelProvider = atom({
     custom_name: '',
     enable: null,
     origin_url: '',
+    doc_url: '',
+    model_url: '',
   },
 })
 

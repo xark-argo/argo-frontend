@@ -1,27 +1,57 @@
-import {Switch} from '@arco-design/web-react'
+import {Message, Switch, Tooltip} from '@arco-design/web-react'
 import {t} from 'i18next'
 import {useEffect, useState} from 'react'
 
+import {hasEnabledTools} from '~/lib/utils'
+
 function DeepResearchItem({detail, handleDeepResearch, modelList}) {
   const [disableSwitch, setDisableSwitch] = useState(false)
+  const [disableReason, setDisableReason] = useState('')
+  
   useEffect(() => {
     if (detail.model_config?.model?.model_id) {
       const model = modelList.find(
         (item) => item.id === detail.model_config.model.model_id
       )
-      const disable =
+      const modelNotSupportTools =
         model &&
         model?.category &&
         (model?.category?.category_label.category.length === 0 ||
           model?.category?.category_label?.category?.findIndex(
             (item) => item?.category === 'tools'
           ) === -1)
+      
+      const noTools = !hasEnabledTools(detail?.model_config?.agent_mode?.tools)
+      
+      const disable = modelNotSupportTools || noTools
       setDisableSwitch(disable)
-      if (disable) {
+      
+      if (modelNotSupportTools) {
+        setDisableReason(t('The current model does not support tool calling, please switch to a model that supports tool calling'))
+      } else if (noTools) {
+        setDisableReason(t('Please enable at least one tool before enabling Deep Research'))
+      } else {
+        setDisableReason('')
+      }
+
+      // 只有在没有工具且深度调研已开启时才自动关闭，避免干扰用户手动操作
+      const isDeepResearchActive = detail?.model_config?.agent_mode?.strategy === 'react_deep_research' && detail?.model_config?.agent_mode?.enabled
+      if (disable && isDeepResearchActive) {
         handleDeepResearch(false)
       }
     }
-  }, [detail.model_config?.model?.model_id, modelList])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail.model_config?.model?.model_id, detail?.model_config?.agent_mode?.tools, modelList])
+
+  const handleSwitchChange = (v) => {
+    if (v && !hasEnabledTools(detail?.model_config?.agent_mode?.tools)) {
+      Message.warning(
+        t('Please enable at least one tool before enabling Deep Research')
+      )
+      return
+    }
+    handleDeepResearch(v)
+  }
 
   return (
     <div className="h-12 rounded-xl bg-gray-50 flex py-2 px-3 justify-between">
@@ -44,17 +74,19 @@ function DeepResearchItem({detail, handleDeepResearch, modelList}) {
         </div>
       </div>
       <div className="flex gap-2 items-center">
-        <Switch
-          className="[&.arco-switch-checked]:bg-[#03060d]"
-          checked={
-            detail?.model_config?.agent_mode.strategy ===
-              'react_deep_research' && detail?.model_config?.agent_mode.enabled
-          }
-          disabled={disableSwitch}
-          onChange={(v) => {
-            handleDeepResearch(v)
-          }}
-        />
+        <Tooltip content={disableSwitch ? disableReason : ''} disabled={!disableSwitch}>
+          <div>
+            <Switch
+              className="[&.arco-switch-checked]:bg-[#03060d]"
+              checked={
+                detail?.model_config?.agent_mode.strategy ===
+                  'react_deep_research' && detail?.model_config?.agent_mode.enabled
+              }
+              disabled={disableSwitch}
+              onChange={handleSwitchChange}
+            />
+          </div>
+        </Tooltip>
       </div>
     </div>
   )

@@ -318,7 +318,10 @@ function Chat() {
     <div
       className="bg-white flex flex-col h-full min-w-100 overflow-hidden relative"
       style={{
-        background: `url(${$botDetail?.background_img}) no-repeat center / 100% 100%`,
+        backgroundImage: `url(${$botDetail?.background_img})`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'center top',
+        backgroundSize: 'cover',
       }}
     >
       <NavBar

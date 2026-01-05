@@ -88,6 +88,8 @@ function Models() {
           custom_name: '',
           enable: null,
           origin_url: '',
+          doc_url: '',
+          model_url: '',
         },
       })
     } catch (err) {

@@ -3,7 +3,6 @@ import {IconDelete, IconEmpty} from '@arco-design/web-react/icon'
 import {useEffect, useState} from 'react'
 import {useTranslation} from 'react-i18next'
 import {Link, useParams} from 'react-router-dom'
-
 import ArgoModal from '~/components/Modal'
 import OverflowTooltip from '~/components/OverflowTooltip'
 import {
@@ -11,6 +10,7 @@ import {
   getKnowledgeList,
   unBindWorkspace,
 } from '~/lib/apis/knowledge'
+import {modelSupportsTools} from '~/lib/utils'
 import IconKnowledge from '~/pages/assets/ic_knowledge.svg'
 import IconTitleKnowledge from '~/pages/assets/knowledge.svg'
 
@@ -22,6 +22,8 @@ function KnowledgeItem({
   selectedList, // id, name
   setSelectedList,
   addKnowledgeKey,
+  modelList,
+  currentModelId,
 }) {
   const {t} = useTranslation()
   const {botId, spaceId} = useParams<{botId: string; spaceId: string}>()
@@ -29,6 +31,9 @@ function KnowledgeItem({
   const [list, setList] = useState([])
   const [selected, setSelected] = useState<any>([]) // collection_name, knowledge_name
   const [visible, setVisible] = useState(false)
+
+  const model = modelList?.find((item) => item.id === currentModelId)
+  const supportsTools = modelSupportsTools(model)
 
   const getList = async () => {
     try {
@@ -282,14 +287,24 @@ function KnowledgeItem({
 
   const renderIcon = () => <img src={IconTitleKnowledge} alt="" />
 
+  const handleAddClick = () => {
+    if (!supportsTools) {
+      Message.warning(
+        t('The current model does not support tool calling, please switch to a model that supports tool calling')
+      )
+      return
+    }
+    setVisible(true)
+  }
+
   return (
     <div>
       <ItemContainer
         icon={renderIcon}
         title={t('Knowledge')}
-        onAdd={() => {
-          setVisible(true)
-        }}
+        onAdd={supportsTools ? handleAddClick : undefined}
+        disabled={!supportsTools}
+        disabledReason={t('The current model does not support tool calling, please switch to a model that supports tool calling')}
       >
         {selectedList?.map((item) => {
           return (

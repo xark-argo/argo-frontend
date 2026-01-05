@@ -516,6 +516,11 @@
   "Activities": "执行过程",
   "Report": "报告",
   "A deep research task is currently in progress. Are you sure you want to turn off the deep research mode?": "当前正在进行深度调研任务，您确定要关闭深度调研模式吗？",
+  "Please enable at least one tool before enabling Deep Research": "启用深度调研前需要先开启至少一个工具",
+  "The current model does not support tool calling, please switch to a model that supports tool calling": "当前模型不支持工具调用，请切换到支持工具调用的模型",
   "Edit Plan Mode": "修改计划",
-  "Completed": "已完成"
+  "Completed": "已完成",
+  "documentation": "文档",
+  "and": "和",
+  "for more details": "获取更多详情"
 }
